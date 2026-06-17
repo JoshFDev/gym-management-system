@@ -3,15 +3,17 @@ import cors from "cors";
 
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Ruta de prueba
+app.get("/", (_req, res) => {
+    res.send("Gym Management API");
+});
+
 app.get("/api/health", (_req, res) => {
     res.status(200).json({
         status: "ok",
-        message: "Gym Management API is running 🚀",
+        message: "Gym Management API is running",
     });
 });
 
