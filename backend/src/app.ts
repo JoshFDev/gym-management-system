@@ -1,19 +1,19 @@
 import express from "express";
 import cors from "cors";
+import authRoutes from "./modules/auth/auth.routes";
 
 const app = express();
 
 app.use(cors());
+
 app.use(express.json());
 
-app.get("/", (_req, res) => {
-    res.send("Gym Management API");
-});
+// Registrar rutas del módulo Auth
+app.use("/api/auth", authRoutes);
 
 app.get("/api/health", (_req, res) => {
-    res.status(200).json({
+    res.json({
         status: "ok",
-        message: "Gym Management API is running",
     });
 });
 
