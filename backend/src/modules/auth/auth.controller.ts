@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import { registerUser } from "./auth.service";
+
+import { registerUser, loginUser } from "./auth.service";
 import { toUserResponse } from "./auth.dto";
 
-export const register = async (
-    req: Request,
-    res: Response
-) => {
-    try {
+import { asyncHandler } from "../../shared/middlewares/asyncHandler";
+
+export const register = asyncHandler(
+    async (req: Request, res: Response) => {
 
         const user = await registerUser(req.body);
 
@@ -16,15 +16,22 @@ export const register = async (
             data: toUserResponse(user),
         });
 
-    } catch (error) {
+    }
+);
 
-        res.status(400).json({
-            success: false,
-            message:
-                error instanceof Error
-                    ? error.message
-                    : "Registration failed.",
+export const login = asyncHandler(
+    async (req: Request, res: Response) => {
+
+        const { token, user } = await loginUser(req.body);
+
+        res.status(200).json({
+            success: true,
+            message: "Login successful.",
+            data: {
+                token,
+                user: toUserResponse(user),
+            },
         });
 
     }
-};
+);

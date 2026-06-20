@@ -1,14 +1,17 @@
 import express from "express";
 import cors from "cors";
+
 import authRoutes from "./modules/auth/auth.routes";
+
+import { errorHandler } from "./shared/middlewares/errorHandler";
 
 const app = express();
 
+// Middlewares
 app.use(cors());
-
 app.use(express.json());
 
-// Registrar rutas del módulo Auth
+// Rutas
 app.use("/api/auth", authRoutes);
 
 app.get("/api/health", (_req, res) => {
@@ -16,5 +19,8 @@ app.get("/api/health", (_req, res) => {
         status: "ok",
     });
 });
+
+// Middleware global de errores
+app.use(errorHandler);
 
 export default app;

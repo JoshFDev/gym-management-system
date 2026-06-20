@@ -1,7 +1,25 @@
 import { IUser } from "./auth.model";
 
-export const toUserResponse = (user: IUser) => ({
-    id: user._id,
+export interface UserResponse {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    phone?: string;
+    isActive: boolean;
+    lastLogin?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface LoginResponse {
+    token: string;
+    user: UserResponse;
+}
+
+export const toUserResponse = (user: IUser): UserResponse => ({
+    id: user._id.toString(),
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
