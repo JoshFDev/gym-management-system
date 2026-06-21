@@ -5,11 +5,15 @@ import authRoutes from "./modules/auth/auth.routes";
 
 import { errorHandler } from "./shared/middlewares/errorHandler";
 
+import memberRoutes from "./modules/members/member.routes";
+
 const app = express();
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use("/api/auth", authRoutes);
+app.use("/api/members", memberRoutes);
 
 // Rutas
 app.use("/api/auth", authRoutes);
