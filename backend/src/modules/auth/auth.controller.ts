@@ -4,6 +4,7 @@ import { registerUser, loginUser } from "./auth.service";
 import { toUserResponse } from "./auth.dto";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
+import { AuthRequest } from "../../shared/middlewares/authenticate";
 
 export const register = asyncHandler(
     async (req: Request, res: Response) => {
@@ -31,6 +32,27 @@ export const login = asyncHandler(
                 token,
                 user: toUserResponse(user),
             },
+        });
+
+    }
+);
+
+export const profile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+
+        res.status(200).json({
+            success: true,
+            data: req.user,
+        });
+
+    }
+);
+export const adminOnly = asyncHandler(
+    async (_req: AuthRequest, res: Response) => {
+
+        res.status(200).json({
+            success: true,
+            message: "Welcome admin.",
         });
 
     }

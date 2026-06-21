@@ -1,0 +1,17 @@
+info:
+  name: AuthProfile
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: http://localhost:3000/api/auth/profile
+  headers:
+    - name: Authorization
+      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTM2MDA5NTBiNmViYzE4NDU3MWI2MzUiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3ODIwMDEyNjksImV4cCI6MTc4MjYwNjA2OX0.U7ci9aSJWEDSjCx2KkRynvuDgHnJ3YqrZ1DT_xt8hw8
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
