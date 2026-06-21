@@ -46,5 +46,10 @@ export const createMemberSchema = z.object({
         .optional(),
 });
 
+export const updateMemberSchema = createMemberSchema.partial();
+
+export type UpdateMemberInput =
+    z.infer<typeof updateMemberSchema>;
+
 export type CreateMemberInput =
     z.infer<typeof createMemberSchema>;

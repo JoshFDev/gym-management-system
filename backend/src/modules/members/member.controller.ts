@@ -4,7 +4,7 @@ import { toMemberResponse } from "./member.dto";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 
-import { createMember, getMembers, getMemberById, } from "./member.service";
+import { createMember, getMembers, getMemberById, updateMember, deactivateMember} from "./member.service";
 
 export const create = asyncHandler(
     async (req: Request, res: Response) => {
@@ -46,6 +46,39 @@ export const getById = asyncHandler(
 
         res.status(200).json({
             success: true,
+            data: toMemberResponse(member),
+        });
+
+    }
+);
+
+export const update = asyncHandler(
+    async (req: Request, res: Response) => {
+
+        const member = await updateMember(
+            req.params.id as string,
+            req.body
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Member updated successfully.",
+            data: toMemberResponse(member),
+        });
+
+    }
+);
+
+export const deactivate = asyncHandler(
+    async (req: Request, res: Response) => {
+
+        const member = await deactivateMember(
+            req.params.id as string
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Member deactivated successfully.",
             data: toMemberResponse(member),
         });
 

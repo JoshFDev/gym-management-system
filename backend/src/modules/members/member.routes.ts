@@ -1,13 +1,18 @@
 import { Router } from "express";
 
-import { create, getAll, getById} from "./member.controller";
+import { create, getAll, getById, deactivate} from "./member.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
 
-import { createMemberSchema } from "./member.validation";
+import { createMemberSchema, updateMemberSchema } from "./member.validation";
 
 import { authenticate } from "../../shared/middlewares/authenticate";
+
 import { authorize } from "../../shared/middlewares/authorize";
+
+import { update } from "./member.controller";
+
+
 
 const router = Router();
 
@@ -33,5 +38,19 @@ router.get(
     getById
 );
 
+router.put(
+    "/:id",
+    authenticate,
+    authorize("admin"),
+    validate(updateMemberSchema),
+    update
+);
+
+router.delete(
+    "/:id",
+    authenticate,
+    authorize("admin"),
+    deactivate
+);
 
 export default router;
