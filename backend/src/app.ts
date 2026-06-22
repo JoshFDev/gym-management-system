@@ -15,7 +15,7 @@ import attendanceRoutes from "./modules/attendance/attendance.routes";
 
 import paymentRoutes from "./modules/payments/payment.routes";
 
-
+import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 
 const app = express();
 
@@ -28,7 +28,7 @@ app.use("/api/plans", planRoutes);
 app.use("/api/subscriptions",subscriptionRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payments", paymentRoutes);
-
+app.use("/api/dashboard", dashboardRoutes);
 
 // Rutas
 app.use("/api/auth", authRoutes);
