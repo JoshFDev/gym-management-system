@@ -11,6 +11,8 @@ import planRoutes from "./modules/plans/plan.routes";
 
 import subscriptionRoutes from "./modules/subscriptions/subscription.routes";
 
+import attendanceRoutes from "./modules/attendance/attendance.routes";
+
 const app = express();
 
 // Middlewares
@@ -20,6 +22,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/plans", planRoutes);
 app.use("/api/subscriptions",subscriptionRoutes);
+app.use("/api/attendance", attendanceRoutes);
+
+
+
 // Rutas
 app.use("/api/auth", authRoutes);
 
