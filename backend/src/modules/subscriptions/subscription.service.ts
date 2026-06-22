@@ -5,7 +5,6 @@ import { SubscriptionStatus } from "./subscription.types";
 import { CreateSubscriptionInput } from "./subscription.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 
-
 export const createSubscription = async (
     data: CreateSubscriptionInput
 ) => {
@@ -50,4 +49,43 @@ export const getSubscriptions = async () => {
         .sort({ createdAt: -1 });
 
     return subscriptions;
+};
+
+export const renewSubscription = async (
+    id: string
+) => {
+
+    const subscription =
+        await Subscription.findById(id);
+
+    if (!subscription) {
+        throw new NotFoundError(
+            "Subscription not found."
+        );
+    }
+
+    const plan = await Plan.findById(
+        subscription.planId
+    );
+
+    if (!plan) {
+        throw new NotFoundError(
+            "Plan not found."
+        );
+    }
+
+    const currentEndDate =
+        new Date(subscription.endDate);
+
+    currentEndDate.setDate(
+        currentEndDate.getDate() +
+        plan.durationDays
+    );
+
+    subscription.endDate =
+        currentEndDate;
+
+    await subscription.save();
+
+    return subscription;
 };

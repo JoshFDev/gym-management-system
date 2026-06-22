@@ -4,18 +4,14 @@ info:
   seq: 1
 
 http:
-  method: GET
-  url: http://localhost:3000/api/subscriptions
+  method: POST
+  url: http://localhost:3000/api/subscriptions/6a39a75aab8ea867ed70e83d/renew
   headers:
     - name: Authorization
       value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTM2MDA5NTBiNmViYzE4NDU3MWI2MzUiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3ODIwMDEyNjksImV4cCI6MTc4MjYwNjA2OX0.U7ci9aSJWEDSjCx2KkRynvuDgHnJ3YqrZ1DT_xt8hw8
   body:
     type: json
-    data: |-
-      {
-        "memberId": "6a384bd253d2dedc1d1f38a0",
-        "planId": "6a39790810b9aa11f46abdb3"
-      }
+    data: ""
   auth: inherit
 
 settings:

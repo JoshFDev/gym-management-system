@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 
-import { createSubscription, getSubscriptions } from "./subscription.service";
+import { createSubscription, getSubscriptions, renewSubscription} from "./subscription.service";
 
 import { toSubscriptionResponse, } from "./subscription.dto";
 
@@ -32,6 +32,33 @@ export const getAll = asyncHandler(
             data: subscriptions.map(
                 toSubscriptionResponse
             ),
+        });
+
+    }
+);
+
+export const renew = asyncHandler(
+    async (req: Request, res: Response) => {
+
+        const subscription =
+            await renewSubscription(
+                req.params.id as string
+            );
+
+        res.status(200).json({
+            success: true,
+            message:
+                "Subscription renewed successfully.",
+            data: {
+                id: subscription._id.toString(),
+                memberId: subscription.memberId.toString(),
+                planId: subscription.planId.toString(),
+                startDate: subscription.startDate,
+                endDate: subscription.endDate,
+                status: subscription.status,
+                createdAt: subscription.createdAt,
+                updatedAt: subscription.updatedAt,
+            },
         });
 
     }

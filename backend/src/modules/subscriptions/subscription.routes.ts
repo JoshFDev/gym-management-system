@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { create, getAll } from "./subscription.controller";
+import { create, getAll,renew } from "./subscription.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
 import { createSubscriptionSchema } from "./subscription.validation";
@@ -24,4 +24,12 @@ router.get(
     authorize("admin"),
     getAll
 );
+
+router.post(
+    "/:id/renew",
+    authenticate,
+    authorize("admin"),
+    renew
+);
+
 export default router;
