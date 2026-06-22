@@ -5,3 +5,22 @@ export const getMembers = async () => {
 
     return response.data;
 };
+
+interface CreateMemberData {
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone: string;
+    gender?: string;
+}
+
+export const createMember = async (
+    data: CreateMemberData
+) => {
+    const response = await api.post(
+        "/members",
+        data
+    );
+
+    return response.data;
+};
