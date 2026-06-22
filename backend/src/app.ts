@@ -9,6 +9,8 @@ import memberRoutes from "./modules/members/member.routes";
 
 import planRoutes from "./modules/plans/plan.routes";
 
+import subscriptionRoutes from "./modules/subscriptions/subscription.routes";
+
 const app = express();
 
 // Middlewares
@@ -17,7 +19,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/plans", planRoutes);
-
+app.use("/api/subscriptions",subscriptionRoutes);
 // Rutas
 app.use("/api/auth", authRoutes);
 
