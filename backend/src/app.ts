@@ -13,6 +13,10 @@ import subscriptionRoutes from "./modules/subscriptions/subscription.routes";
 
 import attendanceRoutes from "./modules/attendance/attendance.routes";
 
+import paymentRoutes from "./modules/payments/payment.routes";
+
+
+
 const app = express();
 
 // Middlewares
@@ -23,7 +27,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/plans", planRoutes);
 app.use("/api/subscriptions",subscriptionRoutes);
 app.use("/api/attendance", attendanceRoutes);
-
+app.use("/api/payments", paymentRoutes);
 
 
 // Rutas

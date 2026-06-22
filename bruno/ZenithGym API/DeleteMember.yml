@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:3000/api/attendance
+  url: http://localhost:3000/api/payments
   headers:
     - name: Authorization
       value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTM2MDA5NTBiNmViYzE4NDU3MWI2MzUiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3ODIwMDEyNjksImV4cCI6MTc4MjYwNjA2OX0.U7ci9aSJWEDSjCx2KkRynvuDgHnJ3YqrZ1DT_xt8hw8
@@ -13,7 +13,11 @@ http:
     type: json
     data: |-
       {
-        "memberId": "6a384bd253d2dedc1d1f38a0"
+        "memberId": "6a384bd253d2dedc1d1f38a0",
+        "subscriptionId": "6a39a75aab8ea867ed70e83d",
+        "amount": 550,
+        "method": "cash",
+        "notes": "Pago mensual"
       }
   auth: inherit
 
