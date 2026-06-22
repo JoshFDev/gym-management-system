@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 
-import { toSubscriptionResponse } from "./subscription.dto";
-
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 
 import { createSubscription, getSubscriptions } from "./subscription.service";
+
+import { toSubscriptionResponse, } from "./subscription.dto";
 
 export const create = asyncHandler(
     async (req: Request, res: Response) => {
@@ -16,7 +16,7 @@ export const create = asyncHandler(
         res.status(201).json({
             success: true,
             message: "Subscription created successfully.",
-            data: toSubscriptionResponse(subscription),
+            data: subscription,
         });
 
     }
@@ -29,7 +29,11 @@ export const getAll = asyncHandler(
 
         res.status(200).json({
             success: true,
-            data: subscriptions,
+            data: subscriptions.map(
+                toSubscriptionResponse
+            ),
         });
+
     }
 );
+
