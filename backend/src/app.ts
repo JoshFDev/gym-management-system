@@ -7,6 +7,8 @@ import { errorHandler } from "./shared/middlewares/errorHandler";
 
 import memberRoutes from "./modules/members/member.routes";
 
+import planRoutes from "./modules/plans/plan.routes";
+
 const app = express();
 
 // Middlewares
@@ -14,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/members", memberRoutes);
+app.use("/api/plans", planRoutes);
 
 // Rutas
 app.use("/api/auth", authRoutes);

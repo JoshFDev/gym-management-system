@@ -48,7 +48,7 @@ export const updateMember = async (
         id,
         data,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );
@@ -72,7 +72,7 @@ export const deactivateMember = async (
             membershipStatus: "inactive",
         },
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );

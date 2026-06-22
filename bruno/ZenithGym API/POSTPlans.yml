@@ -1,0 +1,21 @@
+info:
+  name: POSTPlans
+  type: http
+  seq: 1
+
+http:
+  method: DELETE
+  url: http://localhost:3000/api/plans/6a39790810b9aa11f46abdb3
+  headers:
+    - name: Authorization
+      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTM2MDA5NTBiNmViYzE4NDU3MWI2MzUiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3ODIxNTA4MDcsImV4cCI6MTc4Mjc1NTYwN30.TKviM-shcPm1QbNZcDCTPaRaXLUR_BdycVYK9ymZBEk
+  body:
+    type: json
+    data: ""
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
