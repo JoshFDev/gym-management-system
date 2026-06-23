@@ -6,6 +6,7 @@ import { toUserResponse } from "./auth.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
 
+
 export const register = asyncHandler(
     async (req: Request, res: Response) => {
 
@@ -57,3 +58,23 @@ export const adminOnly = asyncHandler(
 
     }
 );
+
+export const forgotPasswordHandler = async (
+    req: Request,
+    res: Response
+) => {
+    res.status(200).json({
+        success: true,
+        message: "Forgot password endpoint pending implementation.",
+    });
+};
+
+export const resetPasswordHandler = async (
+    req: Request,
+    res: Response
+) => {
+    res.status(200).json({
+        success: true,
+        message: "Reset password endpoint pending implementation.",
+    });
+};
