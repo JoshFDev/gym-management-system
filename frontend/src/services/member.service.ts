@@ -13,7 +13,36 @@ interface CreateMemberData {
     phone: string;
     gender?: string;
 }
+interface UpdateMemberData {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    gender?: string;
+    membershipStatus?: string;
+}
 
+export const updateMember = async (
+    id: string,
+    data: UpdateMemberData
+) => {
+    const response = await api.put(
+        `/members/${id}`,
+        data
+    );
+
+    return response.data;
+};
+
+export const deactivateMember = async (
+    id: string
+) => {
+    const response = await api.delete(
+        `/members/${id}`
+    );
+
+    return response.data;
+};
 export const createMember = async (
     data: CreateMemberData
 ) => {

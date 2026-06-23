@@ -19,7 +19,7 @@ const router = Router();
 router.post(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin", "receptionist"),
     validate(createMemberSchema),
     create
 );
@@ -27,21 +27,21 @@ router.post(
 router.get(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin","trainer"),
     getAll
 );
 
 router.get(
     "/:id",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist","trainer"),
     getById
 );
 
 router.put(
     "/:id",
     authenticate,
-    authorize("admin"),
+    authorize("admin", "receptionist"),
     validate(updateMemberSchema),
     update
 );

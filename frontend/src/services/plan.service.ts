@@ -23,3 +23,33 @@ export const createPlan = async (
 
     return response.data;
 };
+
+interface UpdatePlanData {
+    name?: string;
+    description?: string;
+    price?: number;
+    durationDays?: number;
+    status?: string;
+}
+
+export const updatePlan = async (
+    id: string,
+    data: UpdatePlanData
+) => {
+    const response = await api.put(
+        `/plans/${id}`,
+        data
+    );
+
+    return response.data;
+};
+
+export const deactivatePlan = async (
+    id: string
+) => {
+    const response = await api.delete(
+        `/plans/${id}`
+    );
+
+    return response.data;
+};

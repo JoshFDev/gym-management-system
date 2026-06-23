@@ -13,14 +13,14 @@ const router = Router();
 router.get(
     "/",
     authenticate,
-    authorize("admin", "receptionist"),
+    authorize("admin", "receptionist", "trainer"),
     getAll
 );
 
 router.post(
     "/",
     authenticate,
-    authorize("admin", "receptionist"),
+    authorize("admin", "receptionist", "trainer"),
     validate(createAttendanceSchema),
     create
 );

@@ -3,6 +3,7 @@
 		"cors": "^2.8.6"
 	},
 	"devDependencies": {
-		"@types/cors": "^2.8.19"
+		"@types/cors": "^2.8.19",
+		"@types/recharts": "^2.0.1"
 	}
 }
