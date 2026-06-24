@@ -9,76 +9,79 @@ import SubscriptionsPage from "../pages/SubscriptionsPage";
 import AttendancePage from "../pages/AttendancePage";
 import PaymentsPage from "../pages/PaymentsPage";
 import UsersPage from "../pages/UsersPage";
+import ProfilePage from "../pages/ProfilePage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
 import ResetPasswordPage from "../pages/ResetPasswordPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 
 export default function AppRouter() {
     return (
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<Navigate to="/login" />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/unauthorized" element={<UnauthorizedPage />} />
-                <Route
-                    path="/reset-password/:token"
-                    element={<ResetPasswordPage />}
-                />
+
+                {/* ── Rutas públicas ── */}
+                <Route path="/login"              element={<LoginPage />} />
+                <Route path="/forgot-password"    element={<ForgotPasswordPage />} />
+                <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+                <Route path="/unauthorized"       element={<UnauthorizedPage />} />
+
+                {/* ── Rutas protegidas ── */}
                 <Route element={
                     <ProtectedRoute>
                         <DashboardLayout />
                     </ProtectedRoute>
                 }>
-                    {/* Admin + Receptionist + Trainer */}
                     <Route path="/dashboard" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist"]}>
                             <DashboardPage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Admin + Receptionist + Trainer */}
                     <Route path="/members" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
                             <MembersPage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Solo Admin */}
                     <Route path="/plans" element={
                         <ProtectedRoute allowedRoles={["admin"]}>
                             <PlansPage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Admin + Receptionist */}
                     <Route path="/subscriptions" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist"]}>
                             <SubscriptionsPage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Admin + Receptionist */}
                     <Route path="/payments" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist"]}>
                             <PaymentsPage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Todos */}
                     <Route path="/attendance" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
                             <AttendancePage />
                         </ProtectedRoute>
                     } />
 
-                    {/* Solo Admin */}
                     <Route path="/users" element={
                         <ProtectedRoute allowedRoles={["admin"]}>
                             <UsersPage />
                         </ProtectedRoute>
                     } />
+
+                    {/* ── Perfil: accesible por todos los roles ── */}
+                    <Route path="/profile" element={
+                        <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
+                            <ProfilePage />
+                        </ProtectedRoute>
+                    } />
                 </Route>
             </Routes>
         </BrowserRouter>
-
     );
 }
