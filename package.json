@@ -1,9 +1,11 @@
 {
 	"dependencies": {
-		"cors": "^2.8.6"
+		"cors": "^2.8.6",
+		"nodemailer": "^9.0.1"
 	},
 	"devDependencies": {
 		"@types/cors": "^2.8.19",
+		"@types/nodemailer": "^8.0.1",
 		"@types/recharts": "^2.0.1"
 	}
 }

@@ -1,17 +1,16 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import DashboardLayout from "../layouts/DashboardLayout";
-import LoginPage        from "../pages/LoginPage";
-import DashboardPage    from "../pages/DashboardPage";
-import MembersPage      from "../pages/MembersPage";
-import PlansPage        from "../pages/PlansPage";
+import LoginPage from "../pages/LoginPage";
+import DashboardPage from "../pages/DashboardPage";
+import MembersPage from "../pages/MembersPage";
+import PlansPage from "../pages/PlansPage";
 import SubscriptionsPage from "../pages/SubscriptionsPage";
-import AttendancePage   from "../pages/AttendancePage";
-import PaymentsPage     from "../pages/PaymentsPage";
+import AttendancePage from "../pages/AttendancePage";
+import PaymentsPage from "../pages/PaymentsPage";
 import UsersPage from "../pages/UsersPage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
-
-
+import ResetPasswordPage from "../pages/ResetPasswordPage";
 
 export default function AppRouter() {
     return (
@@ -20,7 +19,10 @@ export default function AppRouter() {
                 <Route path="/" element={<Navigate to="/login" />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
-
+                <Route
+                    path="/reset-password/:token"
+                    element={<ResetPasswordPage />}
+                />
                 <Route element={
                     <ProtectedRoute>
                         <DashboardLayout />
@@ -77,5 +79,6 @@ export default function AppRouter() {
                 </Route>
             </Routes>
         </BrowserRouter>
+
     );
 }

@@ -4,6 +4,8 @@ import { RegisterInput, LoginInput } from "./auth.validation";
 import { ConflictError } from "../../shared/errors/ConflictError";
 import { UnauthorizedError } from "../../shared/errors/UnauthorizedError";
 import { generateToken } from "../../utils/jwt";
+import crypto from "crypto";
+import { sendMail } from "../../shared/utils/mail.util";
 
 export const registerUser = async (
     data: RegisterInput
@@ -76,3 +78,74 @@ export const loginUser = async (
         user,
     };
 }
+export const forgotPassword = async (
+    email: string
+) => {
+    const user = await User.findOne({
+        email,
+    });
+
+    if (!user) {
+        return;
+    }
+
+    const resetToken = crypto
+        .randomBytes(32)
+        .toString("hex");
+
+    user.resetPasswordToken = resetToken;
+
+    user.resetPasswordExpires = new Date(
+        Date.now() + 1000 * 60 * 15
+    );
+
+    await user.save();
+
+    const frontendUrl =
+        process.env.FRONTEND_URL ||
+        "http://localhost:5173";
+
+    const resetUrl =
+        `${frontendUrl}/reset-password/${resetToken}`;
+
+    await sendMail(
+        user.email,
+        "Reset your ZenithGym password",
+        `
+            <h2>Password reset request</h2>
+            <p>You requested to reset your password.</p>
+            <p>Click the link below to create a new password:</p>
+            <a href="${resetUrl}">${resetUrl}</a>
+            <p>This link expires in 15 minutes.</p>
+        `
+    );
+};
+
+export const resetPassword = async (
+    token: string,
+    password: string
+) => {
+    const user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+            $gt: new Date(),
+        },
+    });
+
+    if (!user) {
+        throw new Error(
+            "Invalid or expired reset token."
+        );
+    }
+
+    const hashedPassword = await bcrypt.hash(
+        password,
+        12
+    );
+
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+};

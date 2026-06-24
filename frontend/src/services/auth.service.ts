@@ -16,3 +16,16 @@ export const registerRequest = async (data: RegisterData) => {
     const response = await api.post("/auth/register", data);
     return response.data;
 };
+export const resetPasswordRequest = async (
+    token: string,
+    password: string
+) => {
+    const response = await api.post(
+        `/auth/reset-password/${token}`,
+        {
+            password,
+        }
+    );
+
+    return response.data;
+};
