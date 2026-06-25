@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QRCodeSVG } from "qrcode.react";
 import { createMember, getMembers, updateMember } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
@@ -244,6 +245,15 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
                     <div style={sd.section}>
                         <DetailRow label="Alta" value={fmtDate(member.createdAt)} />
                         <DetailRow label="Última actualización" value={fmtDate(member.updatedAt)} />
+                    </div>
+                    <p style={{ ...s.sectionLabel, marginTop: 16 }}><i className="ti ti-qrcode" style={{ fontSize: 12 }} aria-hidden /> Código QR</p>
+                    <div style={sd.section}>
+                        <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                            <QRCodeSVG value={member.id} size={140} level="M" />
+                        </div>
+                        <p style={{ fontSize: 10, color: "#bbb", textAlign: "center", margin: "0 0 12px" }}>
+                            Escanea para registrar entrada
+                        </p>
                     </div>
                 </div>
                 <div style={s.drawerFooter}>

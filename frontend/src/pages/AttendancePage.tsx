@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { createAttendance, getAttendances } from "../services/attendance.service";
 import { getMembers } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Attendance {
     id: string;
@@ -46,6 +48,11 @@ export default function AttendancePage() {
     const [showForm,    setShowForm]    = useState(false);
     const [memberId,    setMemberId]    = useState("");
     const [submitting,  setSubmitting]  = useState(false);
+    const [scanning,    setScanning]    = useState(false);
+    const [toasts,      setToasts]     = useState<ToastMsg[]>([]);
+    const [scanToast,   setScanToast]   = useState<string | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const scannerContainerId = "qr-scanner-container";
 
     // Solo miembros activos pueden hacer check-in
     const activeMembers = members.filter((m) => m.membershipStatus === "active");
@@ -54,6 +61,8 @@ export default function AttendancePage() {
         const res = await getAttendances();
         setAttendances(res.data ?? []);
     };
+
+    useSocketRefresh(["attendance_created"], loadAttendances);
 
     useEffect(() => {
         const init = async () => {
@@ -72,6 +81,72 @@ export default function AttendancePage() {
         };
         init();
     }, []);
+
+    useEffect(() => {
+        return () => { stopScanner(); };
+    }, []);
+
+    useEffect(() => {
+        if (!scanning) return;
+        const el = document.getElementById(scannerContainerId);
+        if (!el) return;
+        const scanner = new Html5Qrcode(scannerContainerId);
+        scannerRef.current = scanner;
+        let cancelled = false;
+        (async () => {
+            try {
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 240, height: 240 } },
+                    async (decodedText) => {
+                        if (cancelled) return;
+                        const member = members.find((m) => m.id === decodedText);
+                        if (!member) {
+                            addToast("QR no válido o miembro no encontrado", "error");
+                            return;
+                        }
+                        if (member.membershipStatus !== "active") {
+                            addToast(`${member.firstName} ${member.lastName} no está activo`, "error");
+                            return;
+                        }
+                        await stopScanner();
+                        setScanToast(`Registrando a ${member.firstName} ${member.lastName}...`);
+                        try {
+                            await createAttendance(member.id);
+                            addToast(`Entrada registrada — ${member.firstName} ${member.lastName}`);
+                            loadAttendances();
+                        } catch {
+                            addToast("Error al registrar entrada", "error");
+                        } finally {
+                            setScanToast(null);
+                        }
+                    },
+                    () => { /* ignore scan errors */ }
+                );
+            } catch {
+                if (!cancelled) {
+                    addToast("No se pudo acceder a la cámara", "error");
+                    setScanning(false);
+                }
+            }
+        })();
+        return () => { cancelled = true; scanner.stop().catch(() => {}); };
+    }, [scanning]);
+
+    const addToast = (text: string, type: "success" | "error" = "success") => {
+        const id = Date.now();
+        setToasts((p) => [...p, { id, text, type }]);
+        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+    };
+
+    const stopScanner = () => {
+        setScanning(false);
+    };
+
+    const startScanner = () => {
+        setShowForm(false);
+        setScanning(true);
+    };
 
     const clearForm = () => {
         setMemberId(""); setShowForm(false);
@@ -99,12 +174,28 @@ export default function AttendancePage() {
 
     return (
         <div style={s.page}>
+            {/* Toasts */}
+            <div style={s.toastStack}>
+                {toasts.map((t) => (
+                    <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
+                        onClick={() => setToasts((p) => p.filter((x) => x.id !== t.id))}>
+                        <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
+                        {t.text}
+                    </div>
+                ))}
+            </div>
+
             <PageHeader
                 title="Asistencia"
                 action={
-                    <GymButton icon="ti-login" onClick={() => { clearForm(); setShowForm(true); }}>
-                        Registrar entrada
-                    </GymButton>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <GymButton icon="ti-qrcode" onClick={startScanner} disabled={scanning}>
+                            {scanning ? "Escaneando..." : "Escanear QR"}
+                        </GymButton>
+                        <GymButton icon="ti-login" onClick={() => { stopScanner(); clearForm(); setShowForm(true); }}>
+                            Registrar entrada
+                        </GymButton>
+                    </div>
                 }
             />
 
@@ -128,8 +219,29 @@ export default function AttendancePage() {
                     </div>
                 </div>
 
+                {/* Scanner QR */}
+                {scanning && (
+                    <div style={s.card}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                            <div>
+                                <p style={s.formTitle}>Escanear QR</p>
+                                <p style={s.formDesc}>Apunta al código QR del miembro para registrar su entrada.</p>
+                            </div>
+                            <button style={s.btnCancel} onClick={stopScanner}>
+                                <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
+                            </button>
+                        </div>
+                        <div id={scannerContainerId} style={s.scannerContainer} />
+                        {scanToast && (
+                            <div style={s.scanToast}>
+                                <span style={s.spinner} /> {scanToast}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Formulario de check-in */}
-                {showForm && (
+                {showForm && !scanning && (
                     <div style={s.card}>
                         <p style={s.formTitle}>Registrar entrada</p>
                         <p style={s.formDesc}>
@@ -226,6 +338,8 @@ export default function AttendancePage() {
     );
 }
 
+interface ToastMsg { id: number; text: string; type: "success" | "error" }
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
@@ -257,4 +371,10 @@ const s: Record<string, React.CSSProperties> = {
     badge:          { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     avatar:         { width: 28, height: 28, borderRadius: "50%", background: "#F0F0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "#666", flexShrink: 0 },
     empty:          { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
+    toastStack:     { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
+    toast:          { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
+    scannerContainer: { width: "100%", maxWidth: 400, minHeight: 250, margin: "0 auto", borderRadius: 8, overflow: "hidden" },
+    btnCancel:      { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
+    scanToast:      { display: "flex", alignItems: "center", gap: 8, justifyContent: "center", marginTop: 12, fontSize: 12, color: "#888" },
+    spinner:        { display: "inline-block", width: 14, height: 14, border: "2px solid #E5E4E2", borderTopColor: "#1a1a1a", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
 };

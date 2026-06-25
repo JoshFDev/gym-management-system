@@ -8,6 +8,7 @@ import {
 import { toAttendanceResponse } from "./attendance.dto";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
+import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
     async (req: Request, res: Response) => {
@@ -15,6 +16,13 @@ export const create = asyncHandler(
         const attendance = await createAttendance(
             req.body
         );
+
+        notifyAll({
+            type: "attendance_created",
+            title: "Entrada registrada",
+            message: "Nuevo check-in registrado",
+            timestamp: new Date().toISOString(),
+        });
 
         res.status(201).json({
             success: true,

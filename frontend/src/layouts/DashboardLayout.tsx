@@ -6,7 +6,8 @@ import {
     Outlet,
     useNavigate,
 } from "react-router-dom";
-import { connectSocket, disconnectSocket } from "../services/socket";
+import { connectSocket, disconnectSocket, onNotification } from "../services/socket";
+import FloatingQrScanner from "../components/FloatingQrScanner";
 
 
 
@@ -42,6 +43,26 @@ export default function DashboardLayout() {
         const token = getStoredToken();
         if (token) connectSocket(token);
         return () => disconnectSocket();
+    }, []);
+
+    useEffect(() => {
+        const unsub = onNotification((data) => {
+            if (data.type === "attendance_created") {
+                try {
+                    const ctx = new AudioContext();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 880;
+                    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.15);
+                } catch { }
+            }
+        });
+        return unsub;
     }, []);
 
     const visibleItems = NAV_ITEMS.filter(
@@ -102,6 +123,7 @@ export default function DashboardLayout() {
 
             <main style={s.main}>
                 <Outlet />
+                {role && (role === "admin" || role === "receptionist") && <FloatingQrScanner />}
             </main>
         </div>
     );

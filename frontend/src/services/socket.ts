@@ -9,6 +9,7 @@ export interface NotificationPayload {
         | "plan_created" | "plan_updated" | "plan_deactivated"
         | "subscription_created" | "subscription_renewed"
         | "payment_created"
+        | "attendance_created"
         | "info";
     title: string;
     message: string;
