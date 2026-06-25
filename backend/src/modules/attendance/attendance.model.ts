@@ -34,6 +34,9 @@ const attendanceSchema = new Schema<IAttendance>(
     }
 );
 
+attendanceSchema.index({ checkInAt: -1 });
+attendanceSchema.index({ memberId: 1, checkInAt: -1 });
+
 const Attendance = model<IAttendance>(
     "Attendance",
     attendanceSchema

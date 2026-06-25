@@ -1,6 +1,7 @@
 import Member from "../members/member.model";
 import Subscription from "../subscriptions/subscription.model";
 import Payment from "./payment.model";
+import { paginate } from "../../shared/utils/pagination";
 
 import {
     CreatePaymentInput,
@@ -45,22 +46,21 @@ export const createPayment = async (
     return payment;
 };
 
-export const getPayments = async () => {
+export const getPayments = async (page: number = 1, limit: number = 20) => {
 
-    const payments = await Payment.find()
-        .populate(
-            "memberId",
-            "firstName lastName email phone"
-        )
-        .populate(
-            "subscriptionId",
-            "startDate endDate status"
-        )
-        .sort({
-            paidAt: -1,
-        });
+    const result = await paginate(
+        Payment,
+        {},
+        page,
+        limit,
+        { paidAt: -1 },
+        [
+            { path: "memberId", select: "firstName lastName email phone" },
+            { path: "subscriptionId", select: "startDate endDate status" },
+        ]
+    );
 
-    return payments;
+    return result;
 };
 
 export const updatePayment = async (

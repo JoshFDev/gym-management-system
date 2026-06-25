@@ -4,6 +4,7 @@ import { getMembers } from "../services/member.service";
 import { getSubscriptions } from "../services/subscription.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Payment {
@@ -167,6 +168,10 @@ export default function PaymentsPage() {
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [toasts, setToasts] = useState<ToastMsg[]>([]);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const limit = 20;
     const toastId = useRef(0);
 
     const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
@@ -179,26 +184,30 @@ export default function PaymentsPage() {
         (sub) => sub.member.id === formValues.memberId && sub.status === "active"
     );
 
-    const loadPayments = async () => {
-        const res = await getPayments();
+    const loadPayments = async (targetPage: number) => {
+        const res = await getPayments(targetPage, limit);
         setPayments(res.data ?? []);
+        setTotal(res.total ?? 0);
+        setTotalPages(res.totalPages ?? 1);
     };
 
-    useSocketRefresh(["payment_created"], loadPayments);
+    useSocketRefresh(["payment_created"], () => loadPayments(page));
 
     useEffect(() => {
         const init = async () => {
             try {
                 const [paymentsRes, membersRes, subsRes] = await Promise.all([
-                    getPayments(), getMembers(), getSubscriptions(),
+                    getPayments(page, limit), getMembers(), getSubscriptions(),
                 ]);
                 setPayments(paymentsRes.data ?? []);
+                setTotal(paymentsRes.total ?? 0);
+                setTotalPages(paymentsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setSubscriptions(subsRes.data ?? []);
             } catch { /* ignore */ } finally { setLoading(false); }
         };
         init();
-    }, []);
+    }, [page]);
 
     const openNew = () => { setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -224,7 +233,7 @@ export default function PaymentsPage() {
                 ...(formValues.notes && { notes: formValues.notes }),
             });
             addToast("Pago registrado correctamente");
-            setDrawerOpen(false); await loadPayments();
+            setDrawerOpen(false); await loadPayments(page);
         } catch { addToast("Error al registrar pago.", "error"); } finally { setSaving(false); }
     };
 
@@ -264,6 +273,9 @@ export default function PaymentsPage() {
                             ))}</tbody>
                         </table>
                     </div>
+                )}
+                {!loading && (
+                    <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onChange={setPage} />
                 )}
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>

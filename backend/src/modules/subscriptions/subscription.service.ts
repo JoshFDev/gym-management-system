@@ -4,6 +4,7 @@ import Subscription from "./subscription.model";
 import { SubscriptionStatus } from "./subscription.types";
 import { CreateSubscriptionInput } from "./subscription.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
+import { paginate } from "../../shared/utils/pagination";
 
 export const createSubscription = async (
     data: CreateSubscriptionInput
@@ -42,13 +43,20 @@ export const createSubscription = async (
     return subscription;
 };
 
-export const getSubscriptions = async () => {
-    const subscriptions = await Subscription.find()
-        .populate("memberId", "firstName lastName email phone")
-        .populate("planId", "name price durationDays")
-        .sort({ createdAt: -1 });
+export const getSubscriptions = async (page: number = 1, limit: number = 20) => {
+    const result = await paginate(
+        Subscription,
+        {},
+        page,
+        limit,
+        { createdAt: -1 },
+        [
+            { path: "memberId", select: "firstName lastName email phone" },
+            { path: "planId", select: "name price durationDays" },
+        ]
+    );
 
-    return subscriptions;
+    return result;
 };
 
 export const renewSubscription = async (

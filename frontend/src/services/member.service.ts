@@ -1,7 +1,7 @@
 import api from "../api/axios";
 
-export const getMembers = async () => {
-    const response = await api.get("/members");
+export const getMembers = async (page: number = 1, limit: number = 20) => {
+    const response = await api.get(`/members?page=${page}&limit=${limit}`);
 
     return response.data;
 };

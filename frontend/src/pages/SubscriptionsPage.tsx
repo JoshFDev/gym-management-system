@@ -4,6 +4,7 @@ import { getMembers } from "../services/member.service";
 import { getPlans } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Subscription {
@@ -173,6 +174,10 @@ export default function SubscriptionsPage() {
     const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
     const [toasts, setToasts] = useState<ToastMsg[]>([]);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const limit = 20;
     const toastId = useRef(0);
 
     const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
@@ -181,26 +186,30 @@ export default function SubscriptionsPage() {
         setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
     }, []);
 
-    const load = async () => {
-        const res = await getSubscriptions();
+    const load = async (targetPage: number) => {
+        const res = await getSubscriptions(targetPage, limit);
         setSubscriptions(res.data ?? []);
+        setTotal(res.total ?? 0);
+        setTotalPages(res.totalPages ?? 1);
     };
 
-    useSocketRefresh(["subscription_created", "subscription_renewed"], load);
+    useSocketRefresh(["subscription_created", "subscription_renewed"], () => load(page));
 
     useEffect(() => {
         const init = async () => {
             try {
                 const [subsRes, membersRes, plansRes] = await Promise.all([
-                    getSubscriptions(), getMembers(), getPlans(),
+                    getSubscriptions(page, limit), getMembers(), getPlans(),
                 ]);
                 setSubscriptions(subsRes.data ?? []);
+                setTotal(subsRes.total ?? 0);
+                setTotalPages(subsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setPlans((plansRes.data ?? []).filter((p: Plan) => p.status === "active"));
             } catch { /* ignore */ } finally { setLoading(false); }
         };
         init();
-    }, []);
+    }, [page]);
 
     const openNew = () => { setFormValues({ memberId: "", planId: "" }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -220,7 +229,7 @@ export default function SubscriptionsPage() {
         try {
             await createSubscription({ memberId: formValues.memberId, planId: formValues.planId });
             addToast("Suscripción creada correctamente");
-            setDrawerOpen(false); await load();
+            setDrawerOpen(false); await load(page);
         } catch { addToast("Error al crear suscripción.", "error"); } finally { setSaving(false); }
     };
 
@@ -231,7 +240,7 @@ export default function SubscriptionsPage() {
         try {
             await renewSubscription(confirmTarget);
             addToast("Suscripción renovada");
-            await load();
+            await load(page);
         } catch { addToast("Error al renovar.", "error"); } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
 
@@ -288,6 +297,9 @@ export default function SubscriptionsPage() {
                             })}</tbody>
                         </table>
                     </div>
+                )}
+                {!loading && (
+                    <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onChange={setPage} />
                 )}
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>

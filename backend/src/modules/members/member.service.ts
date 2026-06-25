@@ -3,6 +3,7 @@ import { CreateMemberInput } from "./member.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 import { UpdateMemberInput } from "./member.validation";
 import AuditLog from "../auditLog/auditLog.model";
+import { paginate } from "../../shared/utils/pagination";
 
 export const createMember = async (
     data: CreateMemberInput
@@ -15,14 +16,11 @@ export const createMember = async (
     return member;
 };
 
-export const getMembers = async () => {
+export const getMembers = async (page: number = 1, limit: number = 20) => {
 
-    const members = await Member.find()
-        .sort({
-            createdAt: -1,
-        });
+    const result = await paginate(Member, {}, page, limit, { createdAt: -1 });
 
-    return members;
+    return result;
 };
 
 export const getMemberById = async (

@@ -1,8 +1,8 @@
 import api from "../api/axios";
 
-export const getPayments = async () => {
-    const response = await api.get("/payments");
-    return response.data; // { success, data: PaymentResponse[] }
+export const getPayments = async (page: number = 1, limit: number = 20) => {
+    const response = await api.get(`/payments?page=${page}&limit=${limit}`);
+    return response.data;
 };
 
 interface CreatePaymentData {

@@ -7,6 +7,7 @@ const CONTAINER_ID = "floating-qr-scanner";
 export default function FloatingQrScanner() {
     const [on, setOn] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
+    const cooldownRef = useRef(false);
     const [toast, setToast] = useState<string | null>(null);
 
     useEffect(() => {
@@ -20,7 +21,9 @@ export default function FloatingQrScanner() {
                     { facingMode: "environment" },
                     { fps: 10, qrbox: { width: 200, height: 200 } },
                     async (decodedText) => {
-                        if (cancelled) return;
+                        if (cancelled || cooldownRef.current) return;
+                        cooldownRef.current = true;
+                        setTimeout(() => { cooldownRef.current = false; }, 5000);
                         setToast(`Registrando...`);
                         try {
                             await createAttendance(decodedText);

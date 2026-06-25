@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { createMember, getMembers, updateMember } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Member {
@@ -329,6 +330,10 @@ export default function MembersPage() {
     const [confirmTarget, setConfirmTarget] = useState<Member | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
     const [toasts, setToasts] = useState<ToastMsg[]>([]);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const limit = 20;
     const toastId = useRef(0);
 
     const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
@@ -337,11 +342,16 @@ export default function MembersPage() {
         setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
     }, []);
 
-    const loadMembers = useCallback(async () => { const res = await getMembers(); setMembers(res.data ?? []); }, []);
+    const loadMembers = useCallback(async (targetPage: number) => {
+        const res = await getMembers(targetPage, limit);
+        setMembers(res.data ?? []);
+        setTotal(res.total ?? 0);
+        setTotalPages(res.totalPages ?? 1);
+    }, []);
 
-    useSocketRefresh(["member_created", "member_updated", "member_deactivated"], loadMembers);
+    useSocketRefresh(["member_created", "member_updated", "member_deactivated"], () => loadMembers(page));
 
-    useEffect(() => { (async () => { try { await loadMembers(); } finally { setLoading(false); } })(); }, [loadMembers]);
+    useEffect(() => { (async () => { try { await loadMembers(page); } finally { setLoading(false); } })(); }, [loadMembers, page]);
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
@@ -352,6 +362,8 @@ export default function MembersPage() {
             return nameMatch && statusMatch && genderMatch;
         });
     }, [members, search, filterStatus, filterGender]);
+
+
 
     const hasFilters = search || filterStatus || filterGender;
     const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterGender(""); };
@@ -382,7 +394,7 @@ export default function MembersPage() {
             const data = { firstName, lastName, phone, ...(email && { email }), ...(gender && { gender }), ...(birthDate && { birthDate }), ...(address && { address }), ...(emergencyContact && { emergencyContact }), ...(notes && { notes }) };
             if (editingId) { await updateMember(editingId, data); addToast("Miembro actualizado"); }
             else { await createMember(data); addToast("Miembro creado correctamente"); }
-            setDrawerOpen(false); await loadMembers();
+            setDrawerOpen(false); await loadMembers(page);
         } catch { addToast("Error al guardar.", "error"); } finally { setSaving(false); }
     };
 
@@ -394,7 +406,7 @@ export default function MembersPage() {
             const newStatus = confirmTarget.membershipStatus === "active" ? "inactive" : "active";
             await updateMember(confirmTarget.id, { membershipStatus: newStatus });
             addToast(newStatus === "active" ? `${confirmTarget.firstName} activado` : `${confirmTarget.firstName} desactivado`);
-            await loadMembers();
+            await loadMembers(page);
         } catch { addToast("No se pudo cambiar el estado.", "error"); } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
     const isDeactivating = confirmTarget?.membershipStatus === "active";
@@ -429,7 +441,7 @@ export default function MembersPage() {
                     <button style={s.btnExport} onClick={() => exportExcel(filtered)}><i className="ti ti-table-export" style={{ fontSize: 14 }} aria-hidden />Excel</button>
                     <button style={s.btnExport} onClick={() => exportPDF(filtered)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
                 </div>
-                {!loading && <p style={s.resultCount}>{hasFilters ? `${filtered.length} de ${members.length}` : `${members.length} miembro${members.length !== 1 ? "s" : ""}`}</p>}
+                {!loading && <p style={s.resultCount}>{hasFilters ? `${filtered.length} de ${total}` : `${total} miembro${total !== 1 ? "s" : ""}`}</p>}
                 {loading ? <p style={s.empty}>Cargando miembros…</p>
                 : filtered.length === 0 ? (
                     <div style={s.emptyState}>
@@ -438,6 +450,7 @@ export default function MembersPage() {
                         {hasFilters && <button style={{ ...s.btnClear, marginTop: 12 }} onClick={clearFilters}>Quitar filtros</button>}
                     </div>
                 ) : (
+                    <>
                     <div style={{ ...s.card, padding: 0 }}>
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
@@ -470,6 +483,10 @@ export default function MembersPage() {
                             ))}</tbody>
                         </table>
                     </div>
+                    {!loading && (
+                        <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onChange={setPage} />
+                    )}
+                    </>
                 )}
             </div>
             <style>{`.member-row { transition: background 0.1s ease; } .member-row:hover { background: #FAFAFA; } .member-row:last-child { border-bottom: none !important; } @keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>

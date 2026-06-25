@@ -45,11 +45,17 @@ export const create = asyncHandler(
 );
 
 export const getAll = asyncHandler(
-    async (_req: Request, res: Response) => {
-        const payments = await getPayments();
+    async (req: Request, res: Response) => {
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+        const result = await getPayments(page, limit);
         res.status(200).json({
             success: true,
-            data: payments.map(toPaymentResponse),
+            data: result.items.map(toPaymentResponse),
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages: result.totalPages,
         });
     }
 );
