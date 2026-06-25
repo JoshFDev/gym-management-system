@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
@@ -172,6 +173,7 @@ function AlertRow({ color, text, badge, badgeColor, badgeBg }: {
 
 // ── Página ────────────────────────────────────────────────────────
 export default function DashboardPage() {
+    const navigate = useNavigate();
     const [stats, setStats] = useState<Stats | null>(null);
     const [members, setMembers] = useState<Member[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -222,7 +224,7 @@ export default function DashboardPage() {
             <PageHeader
                 title="Dashboard"
                 subtitle="Panel de administración · ZenithGym"
-                action={<GymButton icon="ti-plus">Nuevo miembro</GymButton>}
+                action={<GymButton icon="ti-plus" onClick={() => navigate("/members")}>Nuevo miembro</GymButton>}
             />
 
             <div style={s.content}>
