@@ -6,6 +6,11 @@ export const getMembers = async () => {
     return response.data;
 };
 
+export const getMemberById = async (id: string) => {
+    const response = await api.get(`/members/${id}`);
+    return response.data;
+};
+
 interface CreateMemberData {
     firstName: string;
     lastName: string;

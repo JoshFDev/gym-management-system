@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -202,6 +203,7 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
 function MemberDetailDrawer({ member, open, onClose, onEdit }: {
     member: Member | null; open: boolean; onClose: () => void; onEdit: () => void;
 }) {
+    const navigate = useNavigate();
     useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
     if (!member) return null;
     const fmtDate = (iso?: string) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : undefined;
@@ -258,7 +260,10 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
                 </div>
                 <div style={s.drawerFooter}>
                     <button style={s.btnGhost} onClick={onClose}>Cerrar</button>
-                    <button style={s.btnPrimary} onClick={onEdit}><i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />Editar miembro</button>
+                    <button style={s.btnPrimary} onClick={() => navigate(`/members/${member.id}`)}>
+                        <i className="ti ti-external-link" style={{ fontSize: 13 }} aria-hidden />Perfil completo
+                    </button>
+                    <button style={s.btnPrimary} onClick={onEdit}><i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />Editar</button>
                 </div>
             </div>
         </>

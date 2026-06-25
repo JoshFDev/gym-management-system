@@ -4,6 +4,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import LoginPage from "../pages/LoginPage";
 import DashboardPage from "../pages/DashboardPage";
 import MembersPage from "../pages/MembersPage";
+import MemberProfilePage from "../pages/MemberProfilePage";
 import PlansPage from "../pages/PlansPage";
 import SubscriptionsPage from "../pages/SubscriptionsPage";
 import AttendancePage from "../pages/AttendancePage";
@@ -42,6 +43,11 @@ export default function AppRouter() {
                     <Route path="/members" element={
                         <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
                             <MembersPage />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/members/:id" element={
+                        <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
+                            <MemberProfilePage />
                         </ProtectedRoute>
                     } />
 
