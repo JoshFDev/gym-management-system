@@ -1,10 +1,12 @@
-import { clearAuth, useAuth } from "../hooks/useAuth";
+import { useEffect } from "react";
+import { clearAuth, getStoredToken, useAuth } from "../hooks/useAuth";
 import type { UserRole } from "../hooks/useAuth";
 import {
     NavLink,
     Outlet,
     useNavigate,
 } from "react-router-dom";
+import { connectSocket, disconnectSocket } from "../services/socket";
 
 
 
@@ -36,11 +38,18 @@ export default function DashboardLayout() {
     const navigate = useNavigate();
     const { user, role } = useAuth();
 
+    useEffect(() => {
+        const token = getStoredToken();
+        if (token) connectSocket(token);
+        return () => disconnectSocket();
+    }, []);
+
     const visibleItems = NAV_ITEMS.filter(
         (item) => role && item.roles.includes(role)
     );
 
     const handleLogout = () => {
+        disconnectSocket();
         clearAuth();
         navigate("/login");
     };

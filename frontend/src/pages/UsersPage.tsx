@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { registerRequest } from "../services/auth.service";
+import { registerRequest, forgotPasswordRequest } from "../services/auth.service";
 import { getUsers, updateUser, deleteUser } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
@@ -154,9 +154,10 @@ const validateUser = (values: EditForm, isEdit: boolean): FormErrors => {
 // Detail Drawer
 // ─────────────────────────────────────────────
 function UserDetailDrawer({
-    user, open, onClose, onEdit,
+    user, open, onClose, onEdit, onSendReset, sendingReset,
 }: {
     user: User | null; open: boolean; onClose: () => void; onEdit: () => void;
+    onSendReset: () => void; sendingReset: boolean;
 }) {
     useEffect(() => {
         document.body.style.overflow = open ? "hidden" : "";
@@ -232,11 +233,18 @@ function UserDetailDrawer({
 
                 {/* Footer */}
                 <div style={s.drawerFooter}>
-                    <button style={s.btnGhost} onClick={onClose}>Cerrar</button>
-                    <button style={s.btnPrimary} onClick={onEdit}>
-                        <i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />
-                        Editar usuario
-                    </button>
+                    <button style={{ ...s.btnGhost, float: "left" } as React.CSSProperties} onClick={onClose}>Cerrar</button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button style={{ ...s.btnAction, color: "#854F0B", borderColor: "#FDE68A" }}
+                            onClick={onSendReset} disabled={sendingReset}>
+                            {sendingReset ? <span style={s.spinner} /> : <i className="ti ti-mail" style={{ fontSize: 13 }} aria-hidden />}
+                            Restablecer contraseña
+                        </button>
+                        <button style={s.btnPrimary} onClick={onEdit}>
+                            <i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />
+                            Editar usuario
+                        </button>
+                    </div>
                 </div>
             </div>
         </>
@@ -332,11 +340,13 @@ function UserFormDrawer({
                             type="email" placeholder="correo@ejemplo.com" value={values.email}
                             onChange={(e) => onChange("email", e.target.value)} onBlur={() => onBlur("email")} />
                     </Field>
-                    <Field label={editingId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"} required={!editingId} error={errors.password} touched={touched.password}>
-                        <input style={{ ...s.input, ...(touched.password && errors.password ? s.inputError : {}) }}
-                            type="password" placeholder="Mínimo 8 caracteres" value={values.password}
-                            onChange={(e) => onChange("password", e.target.value)} onBlur={() => onBlur("password")} />
-                    </Field>
+                    {!editingId && (
+                        <Field label="Contraseña" required error={errors.password} touched={touched.password}>
+                            <input style={{ ...s.input, ...(touched.password && errors.password ? s.inputError : {}) }}
+                                type="password" placeholder="Mínimo 8 caracteres" value={values.password}
+                                onChange={(e) => onChange("password", e.target.value)} onBlur={() => onBlur("password")} />
+                        </Field>
+                    )}
 
                     <p style={{ ...s.sectionLabel, marginTop: 20 }}>
                         <i className="ti ti-shield-lock" style={{ fontSize: 12 }} aria-hidden /> Rol
@@ -400,6 +410,9 @@ export default function UsersPage() {
     const [formValues, setFormValues] = useState<EditForm>({ ...emptyForm });
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+    // Restablecer contraseña
+    const [sendingReset, setSendingReset] = useState(false);
 
     // Eliminar
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
@@ -489,6 +502,21 @@ export default function UsersPage() {
         }
     };
 
+    // Restablecer contraseña
+    const handleSendReset = async () => {
+        if (!viewUser) return;
+        setSendingReset(true);
+        try {
+            await forgotPasswordRequest(viewUser.email);
+            addToast(`Correo de restablecimiento enviado a ${viewUser.email}`);
+            setViewUser(null);
+        } catch {
+            addToast("Error al enviar correo.", "error");
+        } finally {
+            setSendingReset(false);
+        }
+    };
+
     // Eliminar
     const confirmDelete = async () => {
         if (!deleteTarget) return;
@@ -524,6 +552,8 @@ export default function UsersPage() {
                 open={!!viewUser}
                 onClose={() => setViewUser(null)}
                 onEdit={() => viewUser && openEdit(viewUser)}
+                onSendReset={handleSendReset}
+                sendingReset={sendingReset}
             />
 
             <UserFormDrawer

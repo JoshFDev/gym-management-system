@@ -3,6 +3,7 @@ import { AuthRequest } from "../../shared/middlewares/authenticate";
 import { getUsers, updateUser, deleteUser } from "./user.service";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
+import { notifyAdmins } from "../../shared/services/socket.service";
 
 export const getAll = asyncHandler(
     async (_req: Request, res: Response) => {
@@ -37,6 +38,14 @@ export const update = asyncHandler(
             changes: req.body,
         });
 
+        notifyAdmins({
+            type: "user_updated",
+            title: "Usuario actualizado",
+            message: `${req.body.firstName || user.firstName} ${req.body.lastName || user.lastName} fue modificado por ${req.user!.role}`,
+            userId: user._id.toString(),
+            timestamp: new Date().toISOString(),
+        });
+
         res.status(200).json({
             success: true,
             message: "User updated successfully.",
@@ -65,6 +74,14 @@ export const remove = asyncHandler(
             entityId: user._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAdmins({
+            type: "user_deactivated",
+            title: "Usuario desactivado",
+            message: `${user.firstName} ${user.lastName} fue desactivado por ${req.user!.role}`,
+            userId: user._id.toString(),
+            timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({
