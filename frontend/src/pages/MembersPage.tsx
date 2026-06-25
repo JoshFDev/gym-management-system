@@ -5,6 +5,7 @@ import autoTable from "jspdf-autotable";
 import { createMember, getMembers, updateMember } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Member {
     id: string;
@@ -322,6 +323,8 @@ export default function MembersPage() {
     }, []);
 
     const loadMembers = useCallback(async () => { const res = await getMembers(); setMembers(res.data ?? []); }, []);
+
+    useSocketRefresh(["member_created", "member_updated", "member_deactivated"], loadMembers);
 
     useEffect(() => { (async () => { try { await loadMembers(); } finally { setLoading(false); } })(); }, [loadMembers]);
 

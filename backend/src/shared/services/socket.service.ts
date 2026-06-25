@@ -47,7 +47,13 @@ export const getIO = (): Server => {
     return io;
 };
 
-type NotificationType = "user_updated" | "user_created" | "user_deactivated" | "info";
+type NotificationType =
+    | "user_updated" | "user_created" | "user_deactivated"
+    | "member_created" | "member_updated" | "member_deactivated"
+    | "plan_created" | "plan_updated" | "plan_deactivated"
+    | "subscription_created" | "subscription_renewed"
+    | "payment_created"
+    | "info";
 
 interface NotificationPayload {
     type: NotificationType;

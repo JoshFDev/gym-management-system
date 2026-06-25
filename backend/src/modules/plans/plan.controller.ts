@@ -10,6 +10,7 @@ import {
 import { toPlanResponse } from "./plan.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
+import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -21,6 +22,13 @@ export const create = asyncHandler(
             entityId: plan._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAll({
+            type: "plan_created",
+            title: "Plan creado",
+            message: `${plan.name} fue creado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({
@@ -64,6 +72,13 @@ export const update = asyncHandler(
             changes: req.body,
         });
 
+        notifyAll({
+            type: "plan_updated",
+            title: "Plan actualizado",
+            message: `${plan.name} fue modificado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
+        });
+
         res.status(200).json({
             success: true,
             message: "Plan updated successfully.",
@@ -83,6 +98,13 @@ export const deactivate = asyncHandler(
             userId: req.user!.userId,
             userRole: req.user!.role,
             changes: { status: "inactive" },
+        });
+
+        notifyAll({
+            type: "plan_deactivated",
+            title: "Plan desactivado",
+            message: `${plan.name} fue desactivado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({

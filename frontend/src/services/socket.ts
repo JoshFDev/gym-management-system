@@ -3,7 +3,13 @@ import { io, Socket } from "socket.io-client";
 let socket: Socket | null = null;
 
 export interface NotificationPayload {
-    type: "user_updated" | "user_created" | "user_deactivated" | "info";
+    type:
+        | "user_updated" | "user_created" | "user_deactivated"
+        | "member_created" | "member_updated" | "member_deactivated"
+        | "plan_created" | "plan_updated" | "plan_deactivated"
+        | "subscription_created" | "subscription_renewed"
+        | "payment_created"
+        | "info";
     title: string;
     message: string;
     userId?: string;

@@ -4,6 +4,7 @@ import { toMemberResponse } from "./member.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { createMember, getMembers, getMemberById, updateMember, deactivateMember } from "./member.service";
 import { logAudit } from "../auditLog/auditLog.service";
+import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -12,9 +13,16 @@ export const create = asyncHandler(
         await logAudit({
             action: "CREATE",
             entity: "Member",
-            entityId: member._id.toString(),  // ← .toString()
+            entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAll({
+            type: "member_created",
+            title: "Miembro creado",
+            message: `${member.firstName} ${member.lastName} fue registrado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({
@@ -52,10 +60,17 @@ export const update = asyncHandler(
         await logAudit({
             action: "UPDATE",
             entity: "Member",
-            entityId: member._id.toString(),  // ← .toString()
+            entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
             changes: req.body,
+        });
+
+        notifyAll({
+            type: "member_updated",
+            title: "Miembro actualizado",
+            message: `${member.firstName} ${member.lastName} fue modificado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({
@@ -73,10 +88,17 @@ export const deactivate = asyncHandler(
         await logAudit({
             action: "DELETE",
             entity: "Member",
-            entityId: member._id.toString(),  // ← .toString()
+            entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
             changes: { membershipStatus: "inactive" },
+        });
+
+        notifyAll({
+            type: "member_deactivated",
+            title: "Miembro desactivado",
+            message: `${member.firstName} ${member.lastName} fue desactivado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({

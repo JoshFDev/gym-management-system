@@ -4,6 +4,7 @@ import { getMembers } from "../services/member.service";
 import { getPlans } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Subscription {
     id: string;
@@ -184,6 +185,8 @@ export default function SubscriptionsPage() {
         const res = await getSubscriptions();
         setSubscriptions(res.data ?? []);
     };
+
+    useSocketRefresh(["subscription_created", "subscription_renewed"], load);
 
     useEffect(() => {
         const init = async () => {

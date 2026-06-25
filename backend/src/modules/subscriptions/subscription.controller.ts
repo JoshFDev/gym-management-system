@@ -8,6 +8,7 @@ import {
 } from "./subscription.service";
 import { toSubscriptionResponse } from "./subscription.dto";
 import { logAudit } from "../auditLog/auditLog.service";
+import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -19,6 +20,13 @@ export const create = asyncHandler(
             entityId: subscription._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAll({
+            type: "subscription_created",
+            title: "Suscripción creada",
+            message: `Nueva suscripción creada por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({
@@ -49,6 +57,13 @@ export const renew = asyncHandler(
             entityId: subscription._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAll({
+            type: "subscription_renewed",
+            title: "Suscripción renovada",
+            message: `Suscripción renovada por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({

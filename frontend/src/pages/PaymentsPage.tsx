@@ -4,6 +4,7 @@ import { getMembers } from "../services/member.service";
 import { getSubscriptions } from "../services/subscription.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Payment {
     id: string;
@@ -182,6 +183,8 @@ export default function PaymentsPage() {
         const res = await getPayments();
         setPayments(res.data ?? []);
     };
+
+    useSocketRefresh(["payment_created"], loadPayments);
 
     useEffect(() => {
         const init = async () => {

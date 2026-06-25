@@ -15,6 +15,7 @@ import { getUsers, updateUser, deleteUser } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import type { UserRole } from "../hooks/useAuth";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 // ─────────────────────────────────────────────
 // Constantes de rol
@@ -435,6 +436,8 @@ export default function UsersPage() {
         const res = await getUsers();
         setUsers(res.data ?? []);
     };
+
+    useSocketRefresh(["user_updated", "user_deactivated"], loadUsers);
 
     useEffect(() => {
         (async () => { try { await loadUsers(); } finally { setLoading(false); } })();

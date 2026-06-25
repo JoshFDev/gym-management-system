@@ -4,6 +4,7 @@ import { createPayment, getPayments, updatePayment } from "./payment.service";
 import { toPaymentResponse } from "./payment.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
+import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -15,6 +16,13 @@ export const create = asyncHandler(
             entityId: payment._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
+        });
+
+        notifyAll({
+            type: "payment_created",
+            title: "Pago registrado",
+            message: `Pago de $${payment.amount} registrado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({

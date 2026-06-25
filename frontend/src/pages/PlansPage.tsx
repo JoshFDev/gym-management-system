@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPlan, getPlans, updatePlan } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 interface Plan {
     id: string;
@@ -173,6 +174,8 @@ export default function PlansPage() {
         const res = await getPlans();
         setPlans(res.data ?? []);
     };
+
+    useSocketRefresh(["plan_created", "plan_updated", "plan_deactivated"], loadPlans);
 
     useEffect(() => {
         (async () => { try { await loadPlans(); } finally { setLoading(false); } })();
