@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createPayment, getPayments } from "../services/payment.service";
 import { getMembers } from "../services/member.service";
 import { getSubscriptions } from "../services/subscription.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 
-// Tipos exactos del DTO
 interface Payment {
     id: string;
     member: { id: string; fullName: string; email?: string; phone?: string };
@@ -19,64 +18,164 @@ interface Payment {
     updatedAt: string;
 }
 
-interface Member {
-    id: string;
-    firstName: string;
-    lastName: string;
-    membershipStatus: string;
-}
+interface Member { id: string; firstName: string; lastName: string; membershipStatus: string }
+interface Subscription { id: string; member: { id: string; fullName: string }; plan: { id: string; name: string; price: number }; status: string; endDate: string }
 
-interface Subscription {
-    id: string;
-    member: { id: string; fullName: string };
-    plan: { id: string; name: string; price: number };
-    status: string;
-    endDate: string;
-}
+interface FormErrors { memberId?: string; subscriptionId?: string; amount?: string; method?: string; }
 
-// Helpers
 const statusStyle = (status: string): React.CSSProperties => ({
-    paid:    { background: "#F0F7F1", color: "#3a7d44" },
+    paid: { background: "#F0F7F1", color: "#3a7d44" },
     pending: { background: "#FFF4F0", color: "#c0392b" },
 }[status] ?? { background: "#F0F0EE", color: "#888" });
 
-const statusLabel: Record<string, string> = {
-    paid: "Pagado", pending: "Pendiente",
+const statusLabel: Record<string, string> = { paid: "Pagado", pending: "Pendiente" };
+const methodLabel: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
+
+const fmtDate = (d: string) => new Date(d).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+
+const fmtDateTime = (d: string) => new Date(d).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+interface ToastMsg { id: number; text: string; type: "success" | "error" }
+
+function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
+    return (
+        <div style={s.toastStack}>
+            {toasts.map((t) => (
+                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
+                    onClick={() => onRemove(t.id)}>
+                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
+                    {t.text}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function Field({ label, required, error, touched, children }: {
+    label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
+}) {
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={s.fieldLabel}>{label}{required && <span style={{ color: "#c0392b", marginLeft: 2 }}>*</span>}</label>
+            {children}
+            {touched && error && <span style={s.fieldError}>{error}</span>}
+        </div>
+    );
+}
+
+interface DrawerProps {
+    open: boolean; saving: boolean;
+    values: Record<string, string>; errors: FormErrors; touched: Record<string, boolean>;
+    members: Member[]; memberSubscriptions: Subscription[];
+    onChange: (field: string, val: string) => void; onBlur: (field: string) => void;
+    onSubmit: (e: React.FormEvent) => void; onClose: () => void;
+}
+
+function PaymentDrawer({ open, saving, values, errors, touched, members, memberSubscriptions, onChange, onBlur, onSubmit, onClose }: DrawerProps) {
+    useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
+    const firstRef = useRef<HTMLSelectElement>(null);
+    useEffect(() => { if (open) setTimeout(() => firstRef.current?.focus(), 300); }, [open]);
+
+    const handleMemberChange = (id: string) => {
+        onChange("memberId", id);
+        onChange("subscriptionId", "");
+    };
+
+    return (
+        <>
+            <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", zIndex: 800 }} onClick={onClose} aria-hidden />
+            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label="Registrar pago">
+                <div style={s.drawerHeader}>
+                    <div>
+                        <p style={s.drawerTitle}>Registrar pago</p>
+                        <p style={s.drawerSub}>Completa los datos del pago</p>
+                    </div>
+                    <button style={s.btnIcon} onClick={onClose}><i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden /></button>
+                </div>
+                <form onSubmit={onSubmit} style={s.drawerBody} noValidate>
+                    <Field label="Miembro" required error={errors.memberId} touched={touched.memberId}>
+                        <select ref={firstRef} style={{ ...s.input, ...(touched.memberId && errors.memberId ? s.inputError : {}) }}
+                            value={values.memberId} onChange={(e) => handleMemberChange(e.target.value)} onBlur={() => onBlur("memberId")}>
+                            <option value="">Seleccionar miembro</option>
+                            {members.map((m) => (
+                                <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Suscripción" required error={errors.subscriptionId} touched={touched.subscriptionId}>
+                        <select style={{ ...s.input, ...(touched.subscriptionId && errors.subscriptionId ? s.inputError : {}) }}
+                            value={values.subscriptionId} onChange={(e) => onChange("subscriptionId", e.target.value)}
+                            onBlur={() => onBlur("subscriptionId")} disabled={!values.memberId}>
+                            <option value="">{!values.memberId ? "Primero selecciona un miembro" : memberSubscriptions.length === 0 ? "Sin suscripciones activas" : "Seleccionar suscripción"}</option>
+                            {memberSubscriptions.map((sub) => (
+                                <option key={sub.id} value={sub.id}>{sub.plan.name} — vence {fmtDate(sub.endDate)}</option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Monto ($)" required error={errors.amount} touched={touched.amount}>
+                        <input style={{ ...s.input, ...(touched.amount && errors.amount ? s.inputError : {}) }}
+                            type="number" placeholder="450" value={values.amount}
+                            onChange={(e) => onChange("amount", e.target.value)} onBlur={() => onBlur("amount")} min={0} />
+                    </Field>
+                    <Field label="Método de pago" required error={errors.method} touched={touched.method}>
+                        <select style={{ ...s.input, ...(touched.method && errors.method ? s.inputError : {}) }}
+                            value={values.method} onChange={(e) => onChange("method", e.target.value)} onBlur={() => onBlur("method")}>
+                            <option value="">Seleccionar método</option>
+                            <option value="cash">Efectivo</option>
+                            <option value="card">Tarjeta</option>
+                            <option value="transfer">Transferencia</option>
+                        </select>
+                    </Field>
+                    <Field label="Notas">
+                        <input style={s.input} placeholder="Notas opcionales" value={values.notes}
+                            onChange={(e) => onChange("notes", e.target.value)} />
+                    </Field>
+                    <div style={s.drawerFooter}>
+                        <button type="button" style={s.btnGhost} onClick={onClose} disabled={saving}>Cancelar</button>
+                        <button type="submit" style={{ ...s.btnPrimary, opacity: saving ? 0.7 : 1 }} disabled={saving}>
+                            {saving ? <><span style={s.spinner} />Guardando…</>
+                                : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Registrar pago</>}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+}
+
+const validate = (values: Record<string, string>): FormErrors => {
+    const e: FormErrors = {};
+    if (!values.memberId) e.memberId = "Selecciona un miembro";
+    if (!values.subscriptionId) e.subscriptionId = "Selecciona una suscripción";
+    if (!values.amount.trim()) e.amount = "Obligatorio";
+    else if (Number(values.amount) <= 0) e.amount = "Debe ser mayor a 0";
+    if (!values.method) e.method = "Selecciona un método";
+    return e;
 };
 
-const methodLabel: Record<string, string> = {
-    cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia",
-};
-
-const fmtDate = (d: string) =>
-    new Date(d).toLocaleDateString("es-MX", {
-        day: "2-digit", month: "short", year: "numeric",
-    });
-
-const fmtDateTime = (d: string) =>
-    new Date(d).toLocaleString("es-MX", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-    });
+const emptyForm = { memberId: "", subscriptionId: "", amount: "", method: "", notes: "" };
 
 export default function PaymentsPage() {
-    const [payments,      setPayments]      = useState<Payment[]>([]);
-    const [members,       setMembers]       = useState<Member[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [members, setMembers] = useState<Member[]>([]);
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-    const [loading,       setLoading]       = useState(true);
-    const [showForm,      setShowForm]      = useState(false);
-    const [submitting,    setSubmitting]    = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [formValues, setFormValues] = useState({ ...emptyForm });
+    const [errors, setErrors] = useState<FormErrors>({});
+    const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [toasts, setToasts] = useState<ToastMsg[]>([]);
+    const toastId = useRef(0);
 
-    // Campos del formulario — exactamente lo que pide createPayment
-    const [memberId,      setMemberId]      = useState("");
-    const [subscriptionId,setSubscriptionId]= useState("");
-    const [amount,        setAmount]        = useState("");
-    const [method,        setMethod]        = useState("");
-    const [notes,         setNotes]         = useState("");
+    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
+        const id = ++toastId.current;
+        setToasts((p) => [...p, { id, text, type }]);
+        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+    }, []);
 
-    // Suscripciones filtradas por miembro seleccionado
     const memberSubscriptions = subscriptions.filter(
-        (sub) => sub.member.id === memberId && sub.status === "active"
+        (sub) => sub.member.id === formValues.memberId && sub.status === "active"
     );
 
     const loadPayments = async () => {
@@ -88,236 +187,114 @@ export default function PaymentsPage() {
         const init = async () => {
             try {
                 const [paymentsRes, membersRes, subsRes] = await Promise.all([
-                    getPayments(),
-                    getMembers(),
-                    getSubscriptions(),
+                    getPayments(), getMembers(), getSubscriptions(),
                 ]);
                 setPayments(paymentsRes.data ?? []);
                 setMembers(membersRes.data ?? []);
                 setSubscriptions(subsRes.data ?? []);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+            } catch { /* ignore */ } finally { setLoading(false); }
         };
         init();
     }, []);
 
-    const clearForm = () => {
-        setMemberId(""); setSubscriptionId(""); setAmount("");
-        setMethod(""); setNotes(""); setShowForm(false);
-    };
+    const openNew = () => { setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
-    // Al cambiar miembro, resetear suscripción
-    const handleMemberChange = (id: string) => {
-        setMemberId(id);
-        setSubscriptionId("");
+    const handleFieldChange = (field: string, val: string) => {
+        setFormValues((p) => { const next = { ...p, [field]: val }; setErrors(validate(next)); return next; });
     };
+    const handleBlur = (field: string) => { setTouched((p) => ({ ...p, [field]: true })); setErrors(validate(formValues)); };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSubmitting(true);
+        const allTouched = Object.keys(formValues).reduce((acc, k) => ({ ...acc, [k]: true }), {});
+        setTouched(allTouched);
+        const validation = validate(formValues);
+        setErrors(validation);
+        if (Object.keys(validation).length > 0) return;
+        setSaving(true);
         try {
             await createPayment({
-                memberId,
-                subscriptionId,
-                amount: Number(amount),
-                method,
-                ...(notes && { notes }),
+                memberId: formValues.memberId,
+                subscriptionId: formValues.subscriptionId,
+                amount: Number(formValues.amount),
+                method: formValues.method,
+                ...(formValues.notes && { notes: formValues.notes }),
             });
-            clearForm();
-            loadPayments();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setSubmitting(false);
-        }
+            addToast("Pago registrado correctamente");
+            setDrawerOpen(false); await loadPayments();
+        } catch { addToast("Error al registrar pago.", "error"); } finally { setSaving(false); }
     };
 
     return (
         <div style={s.page}>
-            <PageHeader
-                title="Pagos"
-                action={
-                    <GymButton icon="ti-plus" onClick={() => { clearForm(); setShowForm(true); }}>
-                        Registrar pago
-                    </GymButton>
-                }
-            />
-
+            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+            <PaymentDrawer open={drawerOpen} saving={saving} values={formValues} errors={errors} touched={touched}
+                members={members} memberSubscriptions={memberSubscriptions}
+                onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
+            <PageHeader title="Pagos" action={<GymButton icon="ti-plus" onClick={openNew}>Registrar pago</GymButton>} />
             <div style={s.content}>
-
-                {/* Formulario */}
-                {showForm && (
-                    <div style={s.card}>
-                        <p style={s.formTitle}>Registrar pago</p>
-                        <form onSubmit={handleSubmit}>
-                            <div style={s.formGrid}>
-                                <Field label="Miembro *">
-                                    <select
-                                        style={s.input}
-                                        value={memberId}
-                                        onChange={(e) => handleMemberChange(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Seleccionar miembro</option>
-                                        {members.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.firstName} {m.lastName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-
-                                <Field label="Suscripción *">
-                                    <select
-                                        style={s.input}
-                                        value={subscriptionId}
-                                        onChange={(e) => setSubscriptionId(e.target.value)}
-                                        required
-                                        disabled={!memberId}
-                                    >
-                                        <option value="">
-                                            {!memberId
-                                                ? "Primero selecciona un miembro"
-                                                : memberSubscriptions.length === 0
-                                                ? "Sin suscripciones activas"
-                                                : "Seleccionar suscripción"}
-                                        </option>
-                                        {memberSubscriptions.map((sub) => (
-                                            <option key={sub.id} value={sub.id}>
-                                                {sub.plan.name} — vence {fmtDate(sub.endDate)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-
-                                <Field label="Monto ($) *">
-                                    <input
-                                        style={s.input}
-                                        type="number"
-                                        placeholder="450"
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                        min={0}
-                                        required
-                                    />
-                                </Field>
-
-                                <Field label="Método de pago *">
-                                    <select
-                                        style={s.input}
-                                        value={method}
-                                        onChange={(e) => setMethod(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Seleccionar método</option>
-                                        <option value="cash">Efectivo</option>
-                                        <option value="card">Tarjeta</option>
-                                        <option value="transfer">Transferencia</option>
-                                    </select>
-                                </Field>
-
-                                <Field label="Notas">
-                                    <input
-                                        style={s.input}
-                                        placeholder="Notas opcionales"
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                    />
-                                </Field>
-                            </div>
-
-                            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                                <GymButton type="submit" disabled={submitting}>
-                                    {submitting ? "Guardando..." : "Registrar pago"}
-                                </GymButton>
-                                <GymButton type="button" variant="ghost" onClick={clearForm}>
-                                    Cancelar
-                                </GymButton>
-                            </div>
-                        </form>
-                    </div>
-                )}
-
-                {/* Tabla */}
                 {loading ? (
-                    <p style={s.empty}>Cargando pagos...</p>
+                    <p style={s.empty}>Cargando pagos…</p>
                 ) : payments.length === 0 ? (
                     <p style={s.empty}>No hay pagos registrados.</p>
                 ) : (
                     <div style={{ ...s.card, padding: 0 }}>
                         <table style={s.table}>
-                            <thead>
-                                <tr style={s.thead}>
-                                    <th style={s.th}>Miembro</th>
-                                    <th style={s.th}>Monto</th>
-                                    <th style={s.th}>Método</th>
-                                    <th style={s.th}>Estado</th>
-                                    <th style={s.th}>Fecha de pago</th>
-                                    <th style={s.th}>Fin suscripción</th>
-                                    <th style={s.th}>Notas</th>
+                            <thead><tr style={s.thead}>
+                                <th style={s.th}>Miembro</th><th style={s.th}>Monto</th><th style={s.th}>Método</th>
+                                <th style={s.th}>Estado</th><th style={s.th}>Fecha de pago</th>
+                                <th style={s.th}>Fin suscripción</th><th style={s.th}>Notas</th>
+                            </tr></thead>
+                            <tbody>{payments.map((p) => (
+                                <tr key={p.id} style={s.row}>
+                                    <td style={s.td}>
+                                        <p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: "#1a1a1a" }}>{p.member.fullName}</p>
+                                        {p.member.email && <p style={{ margin: 0, fontSize: 11, color: "#bbb" }}>{p.member.email}</p>}
+                                    </td>
+                                    <td style={{ ...s.td, fontWeight: 500 }}>${p.amount}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>{methodLabel[p.method] ?? p.method}</td>
+                                    <td style={s.td}><span style={{ ...s.badge, ...statusStyle(p.status) }}>{statusLabel[p.status] ?? p.status}</span></td>
+                                    <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(p.paidAt)}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>{fmtDate(p.subscription.endDate)}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>{p.notes ?? "—"}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {payments.map((p) => (
-                                    <tr key={p.id} style={s.row}>
-                                        <td style={s.td}>
-                                            <p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: "#1a1a1a" }}>
-                                                {p.member.fullName}
-                                            </p>
-                                            {p.member.email && (
-                                                <p style={{ margin: 0, fontSize: 11, color: "#bbb" }}>
-                                                    {p.member.email}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td style={{ ...s.td, fontWeight: 500 }}>${p.amount}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>
-                                            {methodLabel[p.method] ?? p.method}
-                                        </td>
-                                        <td style={s.td}>
-                                            <span style={{ ...s.badge, ...statusStyle(p.status) }}>
-                                                {statusLabel[p.status] ?? p.status}
-                                            </span>
-                                        </td>
-                                        <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(p.paidAt)}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>{fmtDate(p.subscription.endDate)}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>{p.notes ?? "—"}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                            ))}</tbody>
                         </table>
                     </div>
                 )}
             </div>
-        </div>
-    );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: "#888" }}>{label}</label>
-            {children}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </div>
     );
 }
 
 const s: Record<string, React.CSSProperties> = {
-    page:      { display: "flex", flexDirection: "column", minHeight: "100%" },
-    content:   { padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 },
-    card:      { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: 20, overflow: "hidden" },
-    formTitle: { fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 16 },
-    formGrid:  { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 },
-    input:     { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
-    table:     { width: "100%", borderCollapse: "collapse" },
-    thead:     { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
-    th:        { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
-    row:       { borderBottom: "1px solid #F0F0EE" },
-    td:        { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
-    muted:     { color: "#888" },
-    badge:     { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
-    empty:     { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
+    page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
+    content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
+    toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
+    toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
+    overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
+    drawer: { position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 900, width: 420, background: "#fff", borderLeft: "1px solid #E5E4E2", display: "flex", flexDirection: "column", transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)", boxShadow: "-4px 0 24px rgba(0,0,0,0.08)" },
+    drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
+    drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
+    drawerSub: { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
+    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
+    drawerFooter: { display: "flex", gap: 8, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
+    fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
+    fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
+    input: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, transition: "border-color 0.15s" },
+    inputError: { borderColor: "#fecaca" },
+    btnPrimary: { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
+    btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
+    btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
+    spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    table: { width: "100%", borderCollapse: "collapse" },
+    thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
+    th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
+    row: { borderBottom: "1px solid #F0F0EE" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    muted: { color: "#888", fontSize: 12 },
+    badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
+    empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
 };

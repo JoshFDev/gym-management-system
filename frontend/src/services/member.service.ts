@@ -12,6 +12,10 @@ interface CreateMemberData {
     email?: string;
     phone: string;
     gender?: string;
+    birthDate?: string;
+    address?: string;
+    emergencyContact?: string;
+    notes?: string;
 }
 interface UpdateMemberData {
     firstName?: string;
@@ -19,6 +23,10 @@ interface UpdateMemberData {
     email?: string;
     phone?: string;
     gender?: string;
+    birthDate?: string;
+    address?: string;
+    emergencyContact?: string;
+    notes?: string;
     membershipStatus?: string;
 }
 

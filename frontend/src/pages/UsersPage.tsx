@@ -117,16 +117,38 @@ function ConfirmModal({
 }
 
 // ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+interface FormErrors { firstName?: string; lastName?: string; email?: string; phone?: string; password?: string; role?: string; }
+
+// ─────────────────────────────────────────────
 // Field
 // ─────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, error, touched, children }: {
+    label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
+}) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <label style={s.fieldLabel}>{label}</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={s.fieldLabel}>{label}{required && <span style={{ color: "#c0392b", marginLeft: 2 }}>*</span>}</label>
             {children}
+            {touched && error && <span style={s.fieldError}>{error}</span>}
         </div>
     );
 }
+
+const validateUser = (values: EditForm, isEdit: boolean): FormErrors => {
+    const e: FormErrors = {};
+    if (!values.firstName.trim()) e.firstName = "Obligatorio";
+    else if (values.firstName.trim().length < 2) e.firstName = "Mínimo 2 caracteres";
+    if (!values.lastName.trim()) e.lastName = "Obligatorio";
+    else if (values.lastName.trim().length < 2) e.lastName = "Mínimo 2 caracteres";
+    if (!values.email.trim()) e.email = "Obligatorio";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) e.email = "Correo inválido";
+    if (!isEdit && !values.password.trim()) e.password = "Obligatorio";
+    else if (values.password && values.password.length < 8) e.password = "Mínimo 8 caracteres";
+    if (!values.role) e.role = "Selecciona un rol";
+    return e;
+};
 
 // ─────────────────────────────────────────────
 // Detail Drawer
@@ -241,11 +263,12 @@ interface EditForm {
 }
 
 function UserFormDrawer({
-    open, editingId, saving, values, onChange, onSubmit, onClose,
+    open, editingId, saving, values, errors, touched, onChange, onBlur, onSubmit, onClose,
 }: {
     open: boolean; editingId: string | null; saving: boolean;
-    values: EditForm;
+    values: EditForm; errors: FormErrors; touched: Record<string, boolean>;
     onChange: (f: keyof EditForm, v: string) => void;
+    onBlur: (f: keyof EditForm) => void;
     onSubmit: (e: React.FormEvent) => void;
     onClose: () => void;
 }) {
@@ -278,45 +301,51 @@ function UserFormDrawer({
                     </button>
                 </div>
 
-                <form onSubmit={onSubmit} style={s.drawerBody}>
+                <form onSubmit={onSubmit} style={s.drawerBody} noValidate>
 
                     <p style={s.sectionLabel}>
                         <i className="ti ti-user" style={{ fontSize: 12 }} aria-hidden /> Datos personales
                     </p>
                     <div style={s.formGrid2}>
-                        <Field label="Nombre *">
-                            <input style={s.input} placeholder="Carlos" value={values.firstName}
-                                onChange={(e) => onChange("firstName", e.target.value)} required />
+                        <Field label="Nombre" required error={errors.firstName} touched={touched.firstName}>
+                            <input style={{ ...s.input, ...(touched.firstName && errors.firstName ? s.inputError : {}) }}
+                                placeholder="Carlos" value={values.firstName}
+                                onChange={(e) => onChange("firstName", e.target.value)} onBlur={() => onBlur("firstName")} />
                         </Field>
-                        <Field label="Apellido *">
-                            <input style={s.input} placeholder="Reyes" value={values.lastName}
-                                onChange={(e) => onChange("lastName", e.target.value)} required />
+                        <Field label="Apellido" required error={errors.lastName} touched={touched.lastName}>
+                            <input style={{ ...s.input, ...(touched.lastName && errors.lastName ? s.inputError : {}) }}
+                                placeholder="Reyes" value={values.lastName}
+                                onChange={(e) => onChange("lastName", e.target.value)} onBlur={() => onBlur("lastName")} />
                         </Field>
                     </div>
-                    <Field label="Teléfono">
-                        <input style={s.input} placeholder="55 1234 5678" value={values.phone}
-                            onChange={(e) => onChange("phone", e.target.value)} />
+                    <Field label="Teléfono" error={errors.phone} touched={touched.phone}>
+                        <input style={{ ...s.input, ...(touched.phone && errors.phone ? s.inputError : {}) }}
+                            placeholder="55 1234 5678" value={values.phone}
+                            onChange={(e) => onChange("phone", e.target.value)} onBlur={() => onBlur("phone")} />
                     </Field>
 
                     <p style={{ ...s.sectionLabel, marginTop: 20 }}>
                         <i className="ti ti-lock" style={{ fontSize: 12 }} aria-hidden /> Acceso
                     </p>
-                    <Field label="Correo *">
-                        <input style={s.input} type="email" placeholder="correo@ejemplo.com"
-                            value={values.email} onChange={(e) => onChange("email", e.target.value)} required />
+                    <Field label="Correo" required error={errors.email} touched={touched.email}>
+                        <input style={{ ...s.input, ...(touched.email && errors.email ? s.inputError : {}) }}
+                            type="email" placeholder="correo@ejemplo.com" value={values.email}
+                            onChange={(e) => onChange("email", e.target.value)} onBlur={() => onBlur("email")} />
                     </Field>
-                    <Field label={editingId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *"}>
-                        <input style={s.input} type="password" placeholder="Mínimo 8 caracteres"
-                            value={values.password} onChange={(e) => onChange("password", e.target.value)}
-                            required={!editingId} />
+                    <Field label={editingId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"} required={!editingId} error={errors.password} touched={touched.password}>
+                        <input style={{ ...s.input, ...(touched.password && errors.password ? s.inputError : {}) }}
+                            type="password" placeholder="Mínimo 8 caracteres" value={values.password}
+                            onChange={(e) => onChange("password", e.target.value)} onBlur={() => onBlur("password")} />
                     </Field>
 
                     <p style={{ ...s.sectionLabel, marginTop: 20 }}>
                         <i className="ti ti-shield-lock" style={{ fontSize: 12 }} aria-hidden /> Rol
                     </p>
-                    <Field label="Rol *">
-                        <select style={s.input} value={values.role}
-                            onChange={(e) => onChange("role", e.target.value as UserRole)}>
+                    <Field label="Rol" required error={errors.role} touched={touched.role}>
+                        <select style={{ ...s.input, ...(touched.role && errors.role ? s.inputError : {}) }}
+                            value={values.role} onChange={(e) => onChange("role", e.target.value as UserRole)}
+                            onBlur={() => onBlur("role")}>
+                            <option value="">Seleccionar</option>
                             <option value="admin">Administrador</option>
                             <option value="receptionist">Recepcionista</option>
                             <option value="trainer">Entrenador</option>
@@ -369,6 +398,8 @@ export default function UsersPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [formValues, setFormValues] = useState<EditForm>({ ...emptyForm });
+    const [errors, setErrors] = useState<FormErrors>({});
+    const [touched, setTouched] = useState<Record<string, boolean>>({});
 
     // Eliminar
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
@@ -406,6 +437,7 @@ export default function UsersPage() {
     const openNew = () => {
         setEditingId(null);
         setFormValues({ ...emptyForm });
+        setErrors({}); setTouched({});
         setFormOpen(true);
     };
 
@@ -416,15 +448,23 @@ export default function UsersPage() {
             email: u.email, phone: u.phone ?? "",
             role: u.role, password: "",
         });
+        setErrors({}); setTouched({});
         setViewUser(null);
         setFormOpen(true);
     };
 
-    const handleFieldChange = (f: keyof EditForm, v: string) =>
-        setFormValues((p) => ({ ...p, [f]: v }));
+    const handleFieldChange = (f: keyof EditForm, v: string) => {
+        setFormValues((p) => { const next = { ...p, [f]: v }; setErrors(validateUser(next, !!editingId)); return next; });
+    };
+    const handleBlur = (f: keyof EditForm) => { setTouched((p) => ({ ...p, [f]: true })); setErrors(validateUser(formValues, !!editingId)); };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const allTouched = Object.keys(formValues).reduce((acc, k) => ({ ...acc, [k]: true }), {});
+        setTouched(allTouched);
+        const validation = validateUser(formValues, !!editingId);
+        setErrors(validation);
+        if (Object.keys(validation).length > 0) return;
         setSaving(true);
         try {
             const { firstName, lastName, email, phone, role, password } = formValues;
@@ -491,7 +531,10 @@ export default function UsersPage() {
                 editingId={editingId}
                 saving={saving}
                 values={formValues}
+                errors={errors}
+                touched={touched}
                 onChange={handleFieldChange}
+                onBlur={handleBlur}
                 onSubmit={handleSubmit}
                 onClose={() => setFormOpen(false)}
             />
@@ -740,7 +783,9 @@ const s: Record<string, React.CSSProperties> = {
         margin: "4px 0 4px", display: "flex", alignItems: "center", gap: 5,
     },
     formGrid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-    fieldLabel: { fontSize: 11, fontWeight: 500, color: "#888" },
+    fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
+    fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
+    inputError: { borderColor: "#fecaca" },
     input: {
         background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6,
         padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none",
