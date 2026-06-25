@@ -13,7 +13,7 @@ const router = Router();
 router.post(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     validate(createSubscriptionSchema),
     create
 );
@@ -21,14 +21,14 @@ router.post(
 router.get(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     getAll
 );
 
 router.post(
     "/:id/renew",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     renew
 );
 

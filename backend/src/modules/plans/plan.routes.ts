@@ -23,14 +23,14 @@ const router = Router();
 router.get(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     getAll
 );
 
 router.get(
     "/:id",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     getById
 );
 

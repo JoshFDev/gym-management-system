@@ -36,7 +36,7 @@ router.post(
 router.put(
     "/:id",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     validate(updatePaymentSchema),
     update
 );

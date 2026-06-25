@@ -27,7 +27,7 @@ router.post(
 router.get(
     "/",
     authenticate,
-    authorize("admin","trainer"),
+    authorize("admin","trainer","receptionist"),
     getAll
 );
 
@@ -49,7 +49,7 @@ router.put(
 router.delete(
     "/:id",
     authenticate,
-    authorize("admin"),
+    authorize("admin", "receptionist"),
     deactivate
 );
 

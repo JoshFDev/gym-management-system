@@ -5,7 +5,7 @@ import GymButton from "../components/GymButton";
 import { getDashboardStats } from "../services/dashboard.service";
 import { getMembers } from "../services/member.service";
 import { getPayments } from "../services/payment.service";
-import { getPlans } from "../services/plan.service";
+//import { getPlans } from "../services/plan.service";
 import { getAttendances } from "../services/attendance.service";
 
 Chart.register(...registerables);
@@ -181,11 +181,15 @@ export default function DashboardPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const [statsRes, membersRes, paymentsRes, , attendanceRes] = await Promise.all([
+                const [
+                    statsRes,
+                    membersRes,
+                    paymentsRes,
+                    attendanceRes,
+                ] = await Promise.all([
                     getDashboardStats(),
                     getMembers(),
                     getPayments(),
-                    getPlans(),
                     getAttendances(),
                 ]);
                 setStats(statsRes.data);
@@ -225,36 +229,36 @@ export default function DashboardPage() {
 
                 {/* ── Stats ── */}
                 <div style={s.statsGrid}>
-                        <StatCard
-                            label="Miembros activos"
-                            value={stats.totalMembers}
-                            icon="ti-users"
-                            trend={stats.memberGrowth != null ? `+${stats.memberGrowth} este mes` : undefined}
-                            trendUp
-                        />
-                        <StatCard
-                            label="Ingresos del mes"
-                            value={fmtCurrency(stats.totalRevenue)}
-                            icon="ti-coin"
-                            trend={stats.revenueGrowth != null ? `+${stats.revenueGrowth}% vs mes ant.` : undefined}
-                            trendUp
-                        />
-                        <StatCard
-                            label="Asistencia hoy"
-                            value={stats.todayAttendances}
-                            icon="ti-login"
-                            trend={stats.attendanceDelta != null
-                                ? `${stats.attendanceDelta > 0 ? "+" : ""}${stats.attendanceDelta} vs ayer`
-                                : undefined}
-                            trendUp={stats.attendanceDelta != null ? stats.attendanceDelta >= 0 : undefined}
-                        />
-                        <StatCard
-                            label="Suscripciones activas"
-                            value={stats.activeSubscriptions}
-                            icon="ti-id-badge"
-                            trend={expiringCount > 0 ? `${expiringCount} vencen este mes` : undefined}
-                            trendUp={false}
-                        />
+                    <StatCard
+                        label="Miembros activos"
+                        value={stats.totalMembers}
+                        icon="ti-users"
+                        trend={stats.memberGrowth != null ? `+${stats.memberGrowth} este mes` : undefined}
+                        trendUp
+                    />
+                    <StatCard
+                        label="Ingresos del mes"
+                        value={fmtCurrency(stats.totalRevenue)}
+                        icon="ti-coin"
+                        trend={stats.revenueGrowth != null ? `+${stats.revenueGrowth}% vs mes ant.` : undefined}
+                        trendUp
+                    />
+                    <StatCard
+                        label="Asistencia hoy"
+                        value={stats.todayAttendances}
+                        icon="ti-login"
+                        trend={stats.attendanceDelta != null
+                            ? `${stats.attendanceDelta > 0 ? "+" : ""}${stats.attendanceDelta} vs ayer`
+                            : undefined}
+                        trendUp={stats.attendanceDelta != null ? stats.attendanceDelta >= 0 : undefined}
+                    />
+                    <StatCard
+                        label="Suscripciones activas"
+                        value={stats.activeSubscriptions}
+                        icon="ti-id-badge"
+                        trend={expiringCount > 0 ? `${expiringCount} vencen este mes` : undefined}
+                        trendUp={false}
+                    />
                 </div>
 
                 {/* ── Gráficas ── */}

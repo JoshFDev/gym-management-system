@@ -10,7 +10,7 @@ const router = Router();
 router.get(
     "/stats",
     authenticate,
-    authorize("admin"),
+    authorize("admin","receptionist"),
     getStats
 );
 

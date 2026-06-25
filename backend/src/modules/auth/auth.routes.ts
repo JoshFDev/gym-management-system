@@ -14,41 +14,16 @@ import {
     forgotPasswordHandler,
     resetPasswordHandler,
 } from "./auth.controller";
+
+import { authLimiter, signupLimiter } from "../../shared/middlewares/rateLimiters";
+
+
 const router = Router();
 
-router.post(
-    "/register",
-    validate(registerSchema),
-    register
-);
-
-router.post(
-    "/login",
-    validate(loginSchema),
-    login
-);
-
-router.get(
-    "/profile",
-    authenticate,
-    profile
-);
-router.get(
-    "/admin",
-    authenticate,
-    authorize("admin"),
-    adminOnly
-);
-
-router.post(
-    "/forgot-password",
-    validate(forgotPasswordSchema),
-    forgotPasswordHandler
-);
-
-router.post(
-    "/reset-password/:token",
-    validate(resetPasswordSchema),
-    resetPasswordHandler
-);
+router.post("/register", signupLimiter, validate(registerSchema), register);  // ← acá
+router.post("/login",    authLimiter,   validate(loginSchema),    login);     // ← acá
+router.get("/profile",   authenticate, profile);
+router.get("/admin",     authenticate, authorize("admin"), adminOnly);
+router.post("/forgot-password", validate(forgotPasswordSchema), forgotPasswordHandler);
+router.post("/reset-password/:token", validate(resetPasswordSchema), resetPasswordHandler);
 export default router;

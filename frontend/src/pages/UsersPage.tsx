@@ -1,67 +1,505 @@
-import { useState } from "react";
+/**
+ * UsersPage — ZenithGym
+ *
+ * Requiere agregar en user.service.ts:
+ *   export const getUsers    = ()         => api.get("/users");
+ *   export const updateUser  = (id, data) => api.patch(`/users/${id}`, data);
+ *   export const deleteUser  = (id)       => api.delete(`/users/${id}`);
+ *
+ * El endpoint registerRequest ya existe (se usaba antes para crear).
+ */
+
+import { useEffect, useRef, useState, useMemo } from "react";
 import { registerRequest } from "../services/auth.service";
+import { getUsers, updateUser, deleteUser } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import type { UserRole } from "../hooks/useAuth";
 
+// ─────────────────────────────────────────────
+// Constantes de rol
+// ─────────────────────────────────────────────
 const ROLE_LABEL: Record<UserRole, string> = {
-    admin:        "Administrador",
+    admin: "Administrador",
     receptionist: "Recepcionista",
-    trainer:      "Entrenador",
+    trainer: "Entrenador",
 };
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-    admin:        ["Dashboard", "Miembros", "Planes", "Suscripciones", "Pagos", "Asistencia", "Usuarios"],
+    admin: ["Dashboard", "Miembros", "Planes", "Suscripciones", "Pagos", "Asistencia", "Usuarios"],
     receptionist: ["Dashboard", "Miembros", "Suscripciones", "Pagos", "Asistencia"],
-    trainer:      ["Miembros", "Asistencia"],
+    trainer: ["Miembros", "Asistencia"],
 };
 
-const ROLE_ICON: Record<UserRole, string> = {
-    admin:        "ti-shield-lock",
-    receptionist: "ti-headset",
-    trainer:      "ti-barbell",
+const ROLE_COLOR: Record<UserRole, { bg: string; color: string }> = {
+    admin: { bg: "#EEF2FF", color: "#4338CA" },
+    receptionist: { bg: "#F0F7F1", color: "#3a7d44" },
+    trainer: { bg: "#FEF9F0", color: "#854F0B" },
+};
+
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+interface User {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    role: UserRole;
+    isActive?: boolean;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+const initials = (f: string, l: string) => `${f?.[0] ?? ""}${l?.[0] ?? ""}`.toUpperCase();
+const fmtDate = (iso?: string) =>
+    iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+// ─────────────────────────────────────────────
+// Toast
+// ─────────────────────────────────────────────
+interface ToastMsg { id: number; text: string; type: "success" | "error" }
+
+function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
+    return (
+        <div style={s.toastStack}>
+            {toasts.map((t) => (
+                <div
+                    key={t.id}
+                    style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
+                    onClick={() => onRemove(t.id)}
+                >
+                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
+                    {t.text}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
+// Confirm Modal
+// ─────────────────────────────────────────────
+function ConfirmModal({
+    open, title, body, confirmLabel, loading, onConfirm, onCancel,
+}: {
+    open: boolean; title: string; body: string;
+    confirmLabel: string; loading: boolean;
+    onConfirm: () => void; onCancel: () => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => { if (open) ref.current?.focus(); }, [open]);
+    if (!open) return null;
+    return (
+        <div style={s.overlay} onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} role="dialog" aria-modal>
+            <div ref={ref} tabIndex={-1} style={s.modal} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
+                <div style={s.modalIcon}>
+                    <i className="ti ti-trash" style={{ fontSize: 16, color: "#c0392b" }} aria-hidden />
+                </div>
+                <p style={s.modalTitle}>{title}</p>
+                <p style={s.modalBody}>{body}</p>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+                    <button style={s.btnGhost} onClick={onCancel} disabled={loading}>Cancelar</button>
+                    <button
+                        style={{ ...s.btnDanger, opacity: loading ? 0.7 : 1 }}
+                        onClick={onConfirm} disabled={loading}
+                    >
+                        {loading ? <span style={s.spinner} aria-label="Eliminando…" /> : confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
+// Field
+// ─────────────────────────────────────────────
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <label style={s.fieldLabel}>{label}</label>
+            {children}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
+// Detail Drawer
+// ─────────────────────────────────────────────
+function UserDetailDrawer({
+    user, open, onClose, onEdit,
+}: {
+    user: User | null; open: boolean; onClose: () => void; onEdit: () => void;
+}) {
+    useEffect(() => {
+        document.body.style.overflow = open ? "hidden" : "";
+        return () => { document.body.style.overflow = ""; };
+    }, [open]);
+
+    if (!user) return null;
+
+    const rc = ROLE_COLOR[user.role];
+
+    return (
+        <>
+            <div
+                style={{ ...s.drawerOverlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none" }}
+                onClick={onClose} aria-hidden
+            />
+            <div
+                style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }}
+                role="dialog" aria-modal aria-label="Detalle de usuario"
+            >
+                {/* Header */}
+                <div style={s.drawerHeader}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ ...sd.bigAvatar, background: rc.bg, color: rc.color }}>
+                            {initials(user.firstName, user.lastName)}
+                        </div>
+                        <div>
+                            <p style={s.drawerTitle}>{user.firstName} {user.lastName}</p>
+                            <span style={{ ...sd.roleBadge, background: rc.bg, color: rc.color }}>
+                                {ROLE_LABEL[user.role]}
+                            </span>
+                        </div>
+                    </div>
+                    <button style={s.btnClose} onClick={onClose} aria-label="Cerrar">
+                        <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div style={{ ...s.drawerBody, gap: 0 }}>
+
+                    {/* Datos */}
+                    <p style={s.sectionLabel}>
+                        <i className="ti ti-user" style={{ fontSize: 12 }} aria-hidden /> Información
+                    </p>
+                    <div style={sd.section}>
+                        <DetailRow label="Nombre" value={`${user.firstName} ${user.lastName}`} />
+                        <DetailRow label="Correo" value={user.email} />
+                        <DetailRow label="Teléfono" value={user.phone} />
+                        <DetailRow label="Estado" value={user.isActive !== false ? "Activo" : "Inactivo"} />
+                        <DetailRow label="Alta" value={fmtDate(user.createdAt)} />
+                    </div>
+
+                    {/* Permisos */}
+                    <p style={{ ...s.sectionLabel, marginTop: 20 }}>
+                        <i className="ti ti-shield-check" style={{ fontSize: 12 }} aria-hidden /> Acceso del rol
+                    </p>
+                    <div style={sd.section}>
+                        {ROLE_PERMISSIONS[user.role].map((p, i, arr) => (
+                            <div
+                                key={p}
+                                style={{
+                                    ...sd.permRow,
+                                    borderBottom: i < arr.length - 1 ? "1px solid #F5F5F4" : "none",
+                                }}
+                            >
+                                <i className="ti ti-check" style={{ fontSize: 12, color: "#3a7d44" }} aria-hidden />
+                                <span style={{ fontSize: 12, color: "#555" }}>{p}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div style={s.drawerFooter}>
+                    <button style={s.btnGhost} onClick={onClose}>Cerrar</button>
+                    <button style={s.btnPrimary} onClick={onEdit}>
+                        <i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />
+                        Editar usuario
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+function DetailRow({ label, value }: { label: string; value?: string }) {
+    if (!value) return null;
+    return (
+        <div style={sd.detailRow}>
+            <span style={sd.detailLabel}>{label}</span>
+            <span style={sd.detailValue}>{value}</span>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
+// Edit / Create Drawer
+// ─────────────────────────────────────────────
+interface EditForm {
+    firstName: string; lastName: string;
+    email: string; phone: string;
+    role: UserRole; password: string;
+}
+
+function UserFormDrawer({
+    open, editingId, saving, values, onChange, onSubmit, onClose,
+}: {
+    open: boolean; editingId: string | null; saving: boolean;
+    values: EditForm;
+    onChange: (f: keyof EditForm, v: string) => void;
+    onSubmit: (e: React.FormEvent) => void;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        document.body.style.overflow = open ? "hidden" : "";
+        return () => { document.body.style.overflow = ""; };
+    }, [open]);
+
+    const rc = ROLE_COLOR[values.role];
+
+    return (
+        <>
+            <div
+                style={{ ...s.drawerOverlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none" }}
+                onClick={onClose} aria-hidden
+            />
+            <div
+                style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }}
+                role="dialog" aria-modal aria-label={editingId ? "Editar usuario" : "Nuevo usuario"}
+            >
+                <div style={s.drawerHeader}>
+                    <div>
+                        <p style={s.drawerTitle}>{editingId ? "Editar usuario" : "Nuevo usuario"}</p>
+                        <p style={s.drawerSub}>
+                            {editingId ? "Modifica los datos del usuario" : "Completa los datos para crear la cuenta"}
+                        </p>
+                    </div>
+                    <button style={s.btnClose} onClick={onClose} aria-label="Cerrar">
+                        <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
+                    </button>
+                </div>
+
+                <form onSubmit={onSubmit} style={s.drawerBody}>
+
+                    <p style={s.sectionLabel}>
+                        <i className="ti ti-user" style={{ fontSize: 12 }} aria-hidden /> Datos personales
+                    </p>
+                    <div style={s.formGrid2}>
+                        <Field label="Nombre *">
+                            <input style={s.input} placeholder="Carlos" value={values.firstName}
+                                onChange={(e) => onChange("firstName", e.target.value)} required />
+                        </Field>
+                        <Field label="Apellido *">
+                            <input style={s.input} placeholder="Reyes" value={values.lastName}
+                                onChange={(e) => onChange("lastName", e.target.value)} required />
+                        </Field>
+                    </div>
+                    <Field label="Teléfono">
+                        <input style={s.input} placeholder="55 1234 5678" value={values.phone}
+                            onChange={(e) => onChange("phone", e.target.value)} />
+                    </Field>
+
+                    <p style={{ ...s.sectionLabel, marginTop: 20 }}>
+                        <i className="ti ti-lock" style={{ fontSize: 12 }} aria-hidden /> Acceso
+                    </p>
+                    <Field label="Correo *">
+                        <input style={s.input} type="email" placeholder="correo@ejemplo.com"
+                            value={values.email} onChange={(e) => onChange("email", e.target.value)} required />
+                    </Field>
+                    <Field label={editingId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *"}>
+                        <input style={s.input} type="password" placeholder="Mínimo 8 caracteres"
+                            value={values.password} onChange={(e) => onChange("password", e.target.value)}
+                            required={!editingId} />
+                    </Field>
+
+                    <p style={{ ...s.sectionLabel, marginTop: 20 }}>
+                        <i className="ti ti-shield-lock" style={{ fontSize: 12 }} aria-hidden /> Rol
+                    </p>
+                    <Field label="Rol *">
+                        <select style={s.input} value={values.role}
+                            onChange={(e) => onChange("role", e.target.value as UserRole)}>
+                            <option value="admin">Administrador</option>
+                            <option value="receptionist">Recepcionista</option>
+                            <option value="trainer">Entrenador</option>
+                        </select>
+                    </Field>
+
+                    {/* Preview permisos */}
+                    <div style={{ ...sd.permPreview, borderColor: rc.bg }}>
+                        <p style={{ ...sd.permPreviewTitle, color: rc.color }}>
+                            {ROLE_LABEL[values.role]} · acceso a:
+                        </p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                            {ROLE_PERMISSIONS[values.role].map((p) => (
+                                <span key={p} style={{ ...sd.permTag, background: rc.bg, color: rc.color }}>{p}</span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div style={s.drawerFooter}>
+                        <button type="button" style={s.btnGhost} onClick={onClose} disabled={saving}>Cancelar</button>
+                        <button type="submit" style={{ ...s.btnPrimary, opacity: saving ? 0.7 : 1 }} disabled={saving}>
+                            {saving
+                                ? <><span style={s.spinner} />Guardando…</>
+                                : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />
+                                    {editingId ? "Guardar cambios" : "Crear usuario"}</>
+                            }
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+}
+
+// ─────────────────────────────────────────────
+// Page principal
+// ─────────────────────────────────────────────
+const emptyForm: EditForm = {
+    firstName: "", lastName: "", email: "",
+    phone: "", role: "receptionist", password: "",
 };
 
 export default function UsersPage() {
-    const [showForm,  setShowForm]  = useState(false);
-    const [loading,   setLoading]   = useState(false);
-    const [success,   setSuccess]   = useState("");
-    const [error,     setError]     = useState("");
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const [firstName, setFirstName] = useState("");
-    const [lastName,  setLastName]  = useState("");
-    const [email,     setEmail]     = useState("");
-    const [password,  setPassword]  = useState("");
-    const [role,      setRole]      = useState<UserRole>("receptionist");
-    const [phone,     setPhone]     = useState("");
+    // Drawers
+    const [viewUser, setViewUser] = useState<User | null>(null);
+    const [formOpen, setFormOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [formValues, setFormValues] = useState<EditForm>({ ...emptyForm });
 
-    const clearForm = () => {
-        setFirstName(""); setLastName(""); setEmail("");
-        setPassword(""); setRole("receptionist"); setPhone("");
-        setError("");
-        setShowForm(false);
+    // Eliminar
+    const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
+    // Filtro rápido por rol
+    const [filterRole, setFilterRole] = useState("");
+
+    // Toast
+    const [toasts, setToasts] = useState<ToastMsg[]>([]);
+    const toastId = useRef(0);
+
+    const addToast = (text: string, type: "success" | "error" = "success") => {
+        const id = ++toastId.current;
+        setToasts((p) => [...p, { id, text, type }]);
+        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
     };
+
+    const loadUsers = async () => {
+        const res = await getUsers();
+        setUsers(res.data ?? []);
+    };
+
+    useEffect(() => {
+        (async () => { try { await loadUsers(); } finally { setLoading(false); } })();
+    }, []);
+
+    // Filtrado
+    const filtered = useMemo(() =>
+        filterRole ? users.filter((u) => u.role === filterRole) : users,
+        [users, filterRole]
+    );
+
+    // Form helpers
+    const openNew = () => {
+        setEditingId(null);
+        setFormValues({ ...emptyForm });
+        setFormOpen(true);
+    };
+
+    const openEdit = (u: User) => {
+        setEditingId(u.id);
+        setFormValues({
+            firstName: u.firstName, lastName: u.lastName,
+            email: u.email, phone: u.phone ?? "",
+            role: u.role, password: "",
+        });
+        setViewUser(null);
+        setFormOpen(true);
+    };
+
+    const handleFieldChange = (f: keyof EditForm, v: string) =>
+        setFormValues((p) => ({ ...p, [f]: v }));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true); setError(""); setSuccess("");
+        setSaving(true);
         try {
-            await registerRequest({ firstName, lastName, email, password, role, phone });
-            setSuccess(`Usuario "${firstName} ${lastName}" creado correctamente.`);
-            clearForm();
+            const { firstName, lastName, email, phone, role, password } = formValues;
+            if (editingId) {
+                const data: Record<string, string> = { firstName, lastName, email, role };
+                if (phone) data.phone = phone;
+                if (password) data.password = password;
+                await updateUser(editingId, data);
+                addToast(
+                    "Usuario actualizado. Si cambiaste su rol, deberá volver a iniciar sesión."
+                );
+            } else {
+                await registerRequest({ firstName, lastName, email, password, role, phone });
+                addToast("Usuario creado correctamente");
+            }
+            setFormOpen(false);
+            await loadUsers();
         } catch {
-            setError("No se pudo crear el usuario. Verifica los datos.");
+            addToast("Error al guardar. Verifica los datos.", "error");
         } finally {
-            setLoading(false);
+            setSaving(false);
+        }
+    };
+
+    // Eliminar
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleteLoading(true);
+        try {
+            await deleteUser(deleteTarget.id);
+            addToast(`${deleteTarget.firstName} eliminado del sistema`);
+            await loadUsers();
+        } catch {
+            addToast("No se pudo eliminar el usuario.", "error");
+        } finally {
+            setDeleteLoading(false);
+            setDeleteTarget(null);
         }
     };
 
     return (
         <div style={s.page}>
+            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
+            <ConfirmModal
+                open={!!deleteTarget}
+                title="Eliminar usuario"
+                body={`¿Eliminar a ${deleteTarget?.firstName} ${deleteTarget?.lastName}? Esta acción no se puede deshacer.`}
+                confirmLabel="Sí, eliminar"
+                loading={deleteLoading}
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+            />
+
+            <UserDetailDrawer
+                user={viewUser}
+                open={!!viewUser}
+                onClose={() => setViewUser(null)}
+                onEdit={() => viewUser && openEdit(viewUser)}
+            />
+
+            <UserFormDrawer
+                open={formOpen}
+                editingId={editingId}
+                saving={saving}
+                values={formValues}
+                onChange={handleFieldChange}
+                onSubmit={handleSubmit}
+                onClose={() => setFormOpen(false)}
+            />
+
             <PageHeader
                 title="Usuarios"
                 action={
-                    <GymButton icon="ti-plus" onClick={() => { clearForm(); setShowForm(true); }}>
+                    <GymButton icon="ti-plus" onClick={openNew}>
                         Nuevo usuario
                     </GymButton>
                 }
@@ -69,134 +507,360 @@ export default function UsersPage() {
 
             <div style={s.content}>
 
-                {success && (
-                    <div style={s.successBox}>
-                        <i className="ti ti-circle-check" style={{ fontSize: 14 }} aria-hidden />
-                        {success}
-                    </div>
-                )}
-
-                {showForm && (
-                    <div style={s.card}>
-                        <p style={s.formTitle}>Nuevo usuario del sistema</p>
-                        <form onSubmit={handleSubmit}>
-                            <div style={s.formGrid}>
-                                <Field label="Nombre *">
-                                    <input style={s.input} placeholder="Carlos" value={firstName}
-                                        onChange={(e) => setFirstName(e.target.value)} required />
-                                </Field>
-                                <Field label="Apellido *">
-                                    <input style={s.input} placeholder="Reyes" value={lastName}
-                                        onChange={(e) => setLastName(e.target.value)} required />
-                                </Field>
-                                <Field label="Correo *">
-                                    <input style={s.input} type="email" placeholder="correo@ejemplo.com"
-                                        value={email} onChange={(e) => setEmail(e.target.value)} required />
-                                </Field>
-                                <Field label="Contraseña *">
-                                    <input style={s.input} type="password" placeholder="Mínimo 8 caracteres"
-                                        value={password} onChange={(e) => setPassword(e.target.value)} required />
-                                </Field>
-                                <Field label="Teléfono">
-                                    <input style={s.input} placeholder="55 1234 5678"
-                                        value={phone} onChange={(e) => setPhone(e.target.value)} />
-                                </Field>
-                                <Field label="Rol *">
-                                    <select style={s.input} value={role}
-                                        onChange={(e) => setRole(e.target.value as UserRole)}>
-                                        <option value="admin">Administrador</option>
-                                        <option value="receptionist">Recepcionista</option>
-                                        <option value="trainer">Entrenador</option>
-                                    </select>
-                                </Field>
-                            </div>
-
-                            {/* Permisos del rol seleccionado */}
-                            <div style={s.permBox}>
-                                <p style={s.permTitle}>
-                                    <i className={`ti ${ROLE_ICON[role]}`} style={{ fontSize: 13 }} aria-hidden />
-                                    {ROLE_LABEL[role]} — acceso a:
-                                </p>
-                                <div style={s.permList}>
-                                    {ROLE_PERMISSIONS[role].map((p) => (
-                                        <span key={p} style={s.permTag}>{p}</span>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {error && (
-                                <div style={s.errorBox}>
-                                    <i className="ti ti-alert-circle" style={{ fontSize: 13 }} aria-hidden />
-                                    {error}
-                                </div>
-                            )}
-
-                            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                                <GymButton type="submit" disabled={loading}>
-                                    {loading ? "Creando..." : "Crear usuario"}
-                                </GymButton>
-                                <GymButton type="button" variant="ghost" onClick={clearForm}>
-                                    Cancelar
-                                </GymButton>
-                            </div>
-                        </form>
-                    </div>
-                )}
-
-                {/* Tarjetas de roles — visibles cuando no hay form */}
-                {!showForm && (
-                    <div style={s.rolesGrid}>
-                        {(Object.keys(ROLE_PERMISSIONS) as UserRole[]).map((r) => (
-                            <div key={r} style={s.roleCard}>
-                                <div style={s.roleHeader}>
-                                    <div style={s.roleIconWrap}>
-                                        <i className={`ti ${ROLE_ICON[r]}`} style={{ fontSize: 15, color: "#888" }} aria-hidden />
+                {/* Resumen de roles */}
+                <div style={s.rolesGrid}>
+                    {(["admin", "receptionist", "trainer"] as UserRole[]).map((r) => {
+                        const count = users.filter((u) => u.role === r).length;
+                        const rc = ROLE_COLOR[r];
+                        const active = filterRole === r;
+                        return (
+                            <button
+                                key={r}
+                                style={{
+                                    ...s.roleCard,
+                                    borderColor: active ? rc.color : "#E5E4E2",
+                                    background: active ? rc.bg : "#fff",
+                                    cursor: "pointer",
+                                }}
+                                onClick={() => setFilterRole(active ? "" : r)}
+                            >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                    <div>
+                                        <p style={{ ...s.roleTitle, color: active ? rc.color : "#1a1a1a" }}>
+                                            {ROLE_LABEL[r]}
+                                        </p>
+                                        <p style={s.roleSub}>{ROLE_PERMISSIONS[r].length} módulos</p>
                                     </div>
-                                    <p style={s.roleTitle}>{ROLE_LABEL[r]}</p>
+                                    <span style={{
+                                        fontSize: 22, fontWeight: 600,
+                                        color: active ? rc.color : "#1a1a1a",
+                                        letterSpacing: -0.5,
+                                    }}>
+                                        {count}
+                                    </span>
                                 </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-                                    {ROLE_PERMISSIONS[r].map((p) => (
-                                        <div key={p} style={s.permRow}>
-                                            <i className="ti ti-check" style={{ fontSize: 12, color: "#3a7d44" }} aria-hidden />
-                                            <span style={{ fontSize: 12, color: "#888" }}>{p}</span>
-                                        </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 10 }}>
+                                    {ROLE_PERMISSIONS[r].slice(0, 4).map((p) => (
+                                        <span key={p} style={{
+                                            fontSize: 10, padding: "2px 7px", borderRadius: 20,
+                                            background: active ? "#fff" : "#F7F7F6",
+                                            color: active ? rc.color : "#aaa",
+                                            border: `1px solid ${active ? rc.bg : "#F0F0EE"}`,
+                                        }}>{p}</span>
                                     ))}
+                                    {ROLE_PERMISSIONS[r].length > 4 && (
+                                        <span style={{ fontSize: 10, color: "#bbb" }}>
+                                            +{ROLE_PERMISSIONS[r].length - 4}
+                                        </span>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Contador */}
+                {!loading && (
+                    <p style={s.resultCount}>
+                        {filterRole
+                            ? `${filtered.length} ${ROLE_LABEL[filterRole as UserRole].toLowerCase()}${filtered.length !== 1 ? "s" : ""}`
+                            : `${users.length} usuario${users.length !== 1 ? "s" : ""} en total`
+                        }
+                        {filterRole && (
+                            <button style={s.btnInlineReset} onClick={() => setFilterRole("")}>
+                                · Ver todos
+                            </button>
+                        )}
+                    </p>
+                )}
+
+                {/* Tabla */}
+                {loading ? (
+                    <p style={s.empty}>Cargando usuarios…</p>
+                ) : filtered.length === 0 ? (
+                    <div style={s.emptyState}>
+                        <i className="ti ti-users" style={{ fontSize: 30, color: "#D0D0CE", marginBottom: 10 }} aria-hidden />
+                        <p style={{ margin: 0, fontSize: 13, color: "#bbb" }}>Sin usuarios en este rol</p>
+                    </div>
+                ) : (
+                    <div style={{ ...s.card, padding: 0 }}>
+                        <table style={s.table}>
+                            <thead>
+                                <tr style={s.thead}>
+                                    <th style={s.th}>Usuario</th>
+                                    <th style={s.th}>Correo</th>
+                                    <th style={s.th}>Rol</th>
+                                    <th style={s.th}>Estado</th>
+                                    <th style={s.th}>Alta</th>
+                                    <th style={s.th}>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filtered.map((u) => {
+                                    const rc = ROLE_COLOR[u.role];
+                                    const isActive = u.isActive !== false;
+                                    return (
+                                        <tr key={u.id} style={s.row} className="user-row">
+                                            <td style={s.td}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                    <div style={{ ...sd.avatar, background: rc.bg, color: rc.color }}>
+                                                        {initials(u.firstName, u.lastName)}
+                                                    </div>
+                                                    <p style={s.listName}>{u.firstName} {u.lastName}</p>
+                                                </div>
+                                            </td>
+                                            <td style={{ ...s.td, ...s.muted }}>{u.email}</td>
+                                            <td style={s.td}>
+                                                <span style={{ ...sd.roleBadge, background: rc.bg, color: rc.color }}>
+                                                    {ROLE_LABEL[u.role]}
+                                                </span>
+                                            </td>
+                                            <td style={s.td}>
+                                                <span style={{
+                                                    ...s.badge,
+                                                    background: isActive ? "#F0F7F1" : "#F0F0EE",
+                                                    color: isActive ? "#3a7d44" : "#888",
+                                                }}>
+                                                    {isActive ? "Activo" : "Inactivo"}
+                                                </span>
+                                            </td>
+                                            <td style={{ ...s.td, ...s.muted }}>{fmtDate(u.createdAt)}</td>
+                                            <td style={s.td}>
+                                                <div style={{ display: "flex", gap: 6 }}>
+                                                    <button style={s.btnAction} onClick={() => setViewUser(u)}>
+                                                        Ver
+                                                    </button>
+                                                    <button style={s.btnAction} onClick={() => openEdit(u)}>
+                                                        <i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        style={{ ...s.btnAction, color: "#c0392b", borderColor: "#fecaca" }}
+                                                        onClick={() => setDeleteTarget(u)}
+                                                    >
+                                                        <i className="ti ti-trash" style={{ fontSize: 13 }} aria-hidden />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
+
+            <style>{`
+                .user-row { transition: background 0.1s ease; }
+                .user-row:hover { background: #FAFAFA; }
+                .user-row:last-child { border-bottom: none !important; }
+                @keyframes fadeInDown {
+                    from { opacity: 0; transform: translateY(-6px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
         </div>
     );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: "#888" }}>{label}</label>
-            {children}
-        </div>
-    );
-}
-
+// ─────────────────────────────────────────────
+// Styles — s (compartidos con Members) + sd (específicos)
+// ─────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
-    page:        { display: "flex", flexDirection: "column", minHeight: "100%" },
-    content:     { padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 },
-    card:        { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: 20 },
-    formTitle:   { fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 16 },
-    formGrid:    { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 },
-    input:       { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
-    permBox:     { marginTop: 16, padding: "12px 14px", background: "#F7F7F6", borderRadius: 6 },
-    permTitle:   { fontSize: 12, fontWeight: 500, color: "#1a1a1a", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 },
-    permList:    { display: "flex", flexWrap: "wrap", gap: 6 },
-    permTag:     { fontSize: 11, padding: "2px 8px", background: "#fff", border: "1px solid #E5E4E2", borderRadius: 20, color: "#888" },
-    rolesGrid:   { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 },
-    roleCard:    { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: 16 },
-    roleHeader:  { display: "flex", alignItems: "center", gap: 10 },
-    roleIconWrap:{ width: 32, height: 32, borderRadius: 8, background: "#F7F7F6", display: "flex", alignItems: "center", justifyContent: "center" },
-    roleTitle:   { fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 },
-    permRow:     { display: "flex", alignItems: "center", gap: 8 },
-    successBox:  { display: "flex", alignItems: "center", gap: 8, background: "#F0F7F1", border: "1px solid #bbf7d0", borderRadius: 6, padding: "10px 12px", fontSize: 13, color: "#3a7d44" },
-    errorBox:    { display: "flex", alignItems: "center", gap: 8, background: "#FFF4F0", border: "1px solid #fecaca", borderRadius: 6, padding: "10px 12px", fontSize: 13, color: "#c0392b", marginTop: 12 },
+    page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
+    content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
+
+    toastStack: {
+        position: "fixed", top: 20, right: 20, zIndex: 9999,
+        display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none",
+    },
+    toast: {
+        display: "flex", alignItems: "center", gap: 8,
+        color: "#fff", fontSize: 12, fontWeight: 500,
+        padding: "9px 14px", borderRadius: 8,
+        animation: "fadeInDown 0.2s ease",
+        cursor: "pointer", pointerEvents: "all",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+    },
+
+    overlay: {
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.35)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        animation: "fadeInDown 0.15s ease",
+    },
+    modal: {
+        background: "#fff", borderRadius: 10, padding: "22px 24px",
+        width: 380, boxShadow: "0 8px 32px rgba(0,0,0,0.14)", outline: "none",
+    },
+    modalIcon: {
+        width: 36, height: 36, borderRadius: 8, background: "#FFF4F0",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        marginBottom: 12,
+    },
+    modalTitle: { fontSize: 14, fontWeight: 600, color: "#1a1a1a", margin: "0 0 6px" },
+    modalBody: { fontSize: 13, color: "#666", margin: 0, lineHeight: 1.5 },
+
+    drawerOverlay: {
+        position: "fixed", inset: 0, zIndex: 800,
+        background: "rgba(0,0,0,0.28)",
+        transition: "opacity 0.22s ease",
+    },
+    drawer: {
+        position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 900,
+        width: 420, background: "#fff",
+        borderLeft: "1px solid #E5E4E2",
+        display: "flex", flexDirection: "column",
+        transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)",
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
+    },
+    drawerHeader: {
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        padding: "20px 20px 16px",
+        borderBottom: "1px solid #F0F0EE",
+        flexShrink: 0,
+    },
+    drawerTitle: { fontSize: 14, fontWeight: 600, color: "#1a1a1a", margin: 0 },
+    drawerSub: { fontSize: 11, color: "#bbb", margin: "3px 0 0" },
+    drawerBody: {
+        flex: 1, overflowY: "auto", padding: "18px 20px",
+        display: "flex", flexDirection: "column", gap: 12,
+    },
+    drawerFooter: {
+        display: "flex", gap: 8, justifyContent: "flex-end",
+        padding: "14px 20px",
+        borderTop: "1px solid #F0F0EE",
+        flexShrink: 0,
+    },
+    sectionLabel: {
+        fontSize: 10, fontWeight: 600, color: "#bbb",
+        textTransform: "uppercase" as const, letterSpacing: "0.06em",
+        margin: "4px 0 4px", display: "flex", alignItems: "center", gap: 5,
+    },
+    formGrid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+    fieldLabel: { fontSize: 11, fontWeight: 500, color: "#888" },
+    input: {
+        background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6,
+        padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none",
+        width: "100%", fontFamily: "inherit",
+        boxSizing: "border-box" as const,
+        transition: "border-color 0.15s, background 0.15s",
+    },
+
+    // Resumen roles
+    rolesGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
+    roleCard: {
+        background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8,
+        padding: "14px 16px", textAlign: "left",
+        fontFamily: "inherit", transition: "border-color 0.15s, background 0.15s",
+    },
+    roleTitle: { fontSize: 12, fontWeight: 600, margin: "0 0 2px" },
+    roleSub: { fontSize: 10, color: "#bbb", margin: 0 },
+
+    resultCount: { fontSize: 11, color: "#bbb", margin: 0, display: "flex", alignItems: "center", gap: 4 },
+    btnInlineReset: {
+        background: "none", border: "none", color: "#bbb", fontSize: 11,
+        cursor: "pointer", padding: 0, fontFamily: "inherit",
+        textDecoration: "underline",
+    },
+
+    // Table
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    table: { width: "100%", borderCollapse: "collapse" },
+    thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
+    th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
+    row: { borderBottom: "1px solid #F0F0EE" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    muted: { color: "#888", fontSize: 12 },
+    badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
+    listName: { margin: 0, fontWeight: 500, fontSize: 13, color: "#1a1a1a" },
+
+    btnPrimary: {
+        display: "inline-flex", alignItems: "center", gap: 6,
+        background: "#1a1a1a", color: "#fff", border: "none",
+        borderRadius: 7, padding: "9px 16px", fontSize: 13, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer", transition: "opacity 0.15s",
+    },
+    btnGhost: {
+        background: "none", color: "#555", border: "1px solid #E5E4E2",
+        borderRadius: 7, padding: "9px 16px", fontSize: 13, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s",
+    },
+    btnDanger: {
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+        background: "#c0392b", color: "#fff", border: "none", borderRadius: 7,
+        padding: "9px 16px", fontSize: 13, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer", minWidth: 100,
+        transition: "opacity 0.15s",
+    },
+    btnAction: {
+        display: "inline-flex", alignItems: "center", gap: 5,
+        background: "none", color: "#555",
+        border: "1px solid #E5E4E2", borderRadius: 6,
+        padding: "6px 11px", fontSize: 12, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer",
+        transition: "background 0.12s, border-color 0.12s, color 0.12s",
+    },
+    btnClose: {
+        background: "none", border: "none", cursor: "pointer",
+        color: "#bbb", padding: 4, borderRadius: 6,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "color 0.12s",
+    },
+    spinner: {
+        display: "inline-block", width: 12, height: 12,
+        border: "2px solid rgba(255,255,255,0.3)",
+        borderTopColor: "#fff", borderRadius: "50%",
+        animation: "spin 0.7s linear infinite",
+    },
+
+    empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
+    emptyState: {
+        display: "flex", flexDirection: "column", alignItems: "center",
+        padding: "52px 0", background: "#fff",
+        border: "1px solid #E5E4E2", borderRadius: 8,
+    },
+};
+
+const sd: Record<string, React.CSSProperties> = {
+    avatar: {
+        width: 30, height: 30, borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 10, fontWeight: 600, flexShrink: 0,
+    },
+    bigAvatar: {
+        width: 40, height: 40, borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 14, fontWeight: 600, flexShrink: 0,
+    },
+    roleBadge: {
+        display: "inline-flex", padding: "2px 8px",
+        borderRadius: 20, fontSize: 11, fontWeight: 500,
+    },
+    section: {
+        background: "#FAFAFA", border: "1px solid #F0F0EE",
+        borderRadius: 7, overflow: "hidden", marginTop: 6,
+    },
+    detailRow: {
+        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        padding: "9px 12px", borderBottom: "1px solid #F5F5F4", gap: 16,
+    },
+    detailLabel: { fontSize: 11, color: "#bbb", fontWeight: 500, flexShrink: 0 },
+    detailValue: { fontSize: 12, color: "#1a1a1a", textAlign: "right" as const, wordBreak: "break-word" as const },
+    permRow: {
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "8px 12px",
+    },
+    permPreview: {
+        background: "#FAFAFA", border: "1px solid",
+        borderRadius: 7, padding: "11px 13px", marginTop: 4,
+    },
+    permPreviewTitle: {
+        fontSize: 11, fontWeight: 600, margin: "0 0 8px",
+    },
+    permTag: {
+        fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 500,
+    },
 };
