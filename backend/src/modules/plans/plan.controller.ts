@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-
+import { AuthRequest } from "../../shared/middlewares/authenticate";
 import {
     createPlan,
     getPlans,
@@ -7,86 +7,88 @@ import {
     updatePlan,
     deactivatePlan,
 } from "./plan.service";
-
 import { toPlanResponse } from "./plan.dto";
-
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
+import { logAudit } from "../auditLog/auditLog.service";
 
 export const create = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req: AuthRequest, res: Response) => {
+        const plan = await createPlan(req.body);
 
-        const plan = await createPlan(
-            req.body
-        );
+        await logAudit({
+            action: "CREATE",
+            entity: "Plan",
+            entityId: plan._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+        });
 
         res.status(201).json({
             success: true,
             message: "Plan created successfully.",
             data: toPlanResponse(plan),
         });
-
     }
 );
 
 export const getAll = asyncHandler(
     async (_req: Request, res: Response) => {
-
         const plans = await getPlans();
-
         res.status(200).json({
             success: true,
-            data: plans.map(
-                toPlanResponse
-            ),
+            data: plans.map(toPlanResponse),
         });
-
     }
 );
 
 export const getById = asyncHandler(
     async (req: Request, res: Response) => {
-
-        const plan = await getPlanById(
-            req.params.id as string
-        );
-
+        const plan = await getPlanById(req.params.id as string);
         res.status(200).json({
             success: true,
             data: toPlanResponse(plan),
         });
-
     }
 );
 
 export const update = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req: AuthRequest, res: Response) => {
+        const plan = await updatePlan(req.params.id as string, req.body);
 
-        const plan = await updatePlan(
-            req.params.id as string,
-            req.body
-        );
+        await logAudit({
+            action: "UPDATE",
+            entity: "Plan",
+            entityId: plan._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: req.body,
+        });
 
         res.status(200).json({
             success: true,
             message: "Plan updated successfully.",
             data: toPlanResponse(plan),
         });
-
     }
 );
 
 export const deactivate = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req: AuthRequest, res: Response) => {
+        const plan = await deactivatePlan(req.params.id as string);
 
-        const plan = await deactivatePlan(
-            req.params.id as string
-        );
+        await logAudit({
+            action: "DELETE",
+            entity: "Plan",
+            entityId: plan._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { status: "inactive" },
+        });
 
         res.status(200).json({
             success: true,
             message: "Plan deactivated successfully.",
             data: toPlanResponse(plan),
         });
-
     }
 );

@@ -13,6 +13,7 @@ import ProfilePage from "../pages/ProfilePage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
 import ResetPasswordPage from "../pages/ResetPasswordPage";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import AuditLogPage from "../pages/AuditLogPage";
 
 export default function AppRouter() {
     return (
@@ -71,6 +72,12 @@ export default function AppRouter() {
                     <Route path="/users" element={
                         <ProtectedRoute allowedRoles={["admin"]}>
                             <UsersPage />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/audit-log" element={
+                        <ProtectedRoute allowedRoles={["admin"]}>
+                            <AuditLogPage />
                         </ProtectedRoute>
                     } />
 

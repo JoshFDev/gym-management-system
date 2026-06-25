@@ -18,6 +18,7 @@ import paymentRoutes from "./modules/payments/payment.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 
 import userRoutes from "./modules/users/user.routes";
+import auditLogRoutes from "./modules/auditLog/auditLog.routes";
 
 import { generalLimiter } from "./shared/middlewares/rateLimiters";
 
@@ -52,6 +53,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/audit-logs", auditLogRoutes);
 
 
 // Rutas

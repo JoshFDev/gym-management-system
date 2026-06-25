@@ -2,6 +2,7 @@ import Member from "./member.model";
 import { CreateMemberInput } from "./member.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 import { UpdateMemberInput } from "./member.validation";
+import AuditLog from "../auditLog/auditLog.model";
 
 export const createMember = async (
     data: CreateMemberInput
@@ -84,4 +85,17 @@ export const deactivateMember = async (
     }
 
     return member;
+};
+
+interface LogAuditParams {
+    action: "CREATE" | "UPDATE" | "DELETE";
+    entity: string;
+    entityId: string;
+    userId: string;
+    userRole: string;
+    changes?: Record<string, any>;
+}
+
+export const logAudit = async (params: LogAuditParams) => {
+    await AuditLog.create(params);
 };

@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
     { to: "/payments",     icon: "ti-credit-card",      label: "Pagos",         roles: ["admin", "receptionist"] },
     { to: "/attendance",   icon: "ti-scan",             label: "Asistencia",    roles: ["admin", "receptionist", "trainer"] },
     { to: "/users",        icon: "ti-shield-lock",      label: "Usuarios",      roles: ["admin"] },
+    { to: "/audit-log",    icon: "ti-history",          label: "Auditoría",     roles: ["admin"] },
 ];
 
 const ROLE_LABEL: Record<UserRole, string> = {
