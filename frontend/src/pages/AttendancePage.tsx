@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { createAttendance, getAttendances } from "../services/attendance.service";
 import { getMembers } from "../services/member.service";
@@ -22,6 +22,8 @@ interface Member {
     membershipStatus: string;
 }
 
+interface ToastMsg { id: number; text: string; type: "success" | "error" }
+
 const statusStyle = (status: string): React.CSSProperties => ({
     present: { background: "#F0F7F1", color: "#3a7d44" },
     absent:  { background: "#FFF4F0", color: "#c0392b" },
@@ -41,26 +43,93 @@ const fmtDateTime = (d: string) =>
 const initials = (name: string) =>
     name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
+function AttendanceDrawer({ open, members, submitting, memberId, onMemberChange, onSubmit, onClose }: {
+    open: boolean; members: Member[]; submitting: boolean;
+    memberId: string; onMemberChange: (id: string) => void;
+    onSubmit: (e: React.FormEvent) => void; onClose: () => void;
+}) {
+    useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
+
+    return (
+        <>
+            <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none" }} onClick={onClose} aria-hidden />
+            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label="Registrar entrada">
+                <div style={s.drawerHeader}>
+                    <div>
+                        <p style={s.drawerTitle}>Registrar entrada</p>
+                        <p style={s.drawerSub}>Selecciona el miembro que está ingresando</p>
+                    </div>
+                    <button style={s.btnIcon} onClick={onClose}><i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden /></button>
+                </div>
+                <form onSubmit={onSubmit} style={s.drawerBody} noValidate>
+                    <Field label="Miembro *">
+                        <select style={s.input} value={memberId} onChange={(e) => onMemberChange(e.target.value)} required>
+                            <option value="">Seleccionar miembro</option>
+                            {members.filter((m) => m.membershipStatus === "active").map((m) => (
+                                <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <div style={s.timePreview}>
+                        <i className="ti ti-clock" style={{ fontSize: 13, color: "#bbb" }} aria-hidden />
+                        <span style={{ fontSize: 12, color: "#888" }}>
+                            Se registrará:{" "}
+                            <strong style={{ color: "#1a1a1a" }}>
+                                {new Date().toLocaleString("es-MX", {
+                                    day: "2-digit", month: "short", year: "numeric",
+                                    hour: "2-digit", minute: "2-digit",
+                                })}
+                            </strong>
+                        </span>
+                    </div>
+
+                    <div style={s.drawerFooter}>
+                        <button type="button" style={s.btnGhost} onClick={onClose} disabled={submitting}>Cancelar</button>
+                        <button type="submit" style={{ ...s.btnPrimary, opacity: submitting ? 0.7 : 1 }} disabled={submitting}>
+                            {submitting ? <><span style={s.spinner} />Registrando…</>
+                                : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Confirmar entrada</>}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+            <label style={{ fontSize: 11, fontWeight: 500, color: "#888" }}>{label}</label>
+            {children}
+        </div>
+    );
+}
+
 export default function AttendancePage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
-    const [members,     setMembers]     = useState<Member[]>([]);
-    const [loading,     setLoading]     = useState(true);
-    const [showForm,    setShowForm]    = useState(false);
-    const [memberId,    setMemberId]    = useState("");
-    const [submitting,  setSubmitting]  = useState(false);
-    const [scanning,    setScanning]    = useState(false);
-    const [toasts,      setToasts]     = useState<ToastMsg[]>([]);
-    const [scanToast,   setScanToast]   = useState<string | null>(null);
+    const [members, setMembers] = useState<Member[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [memberId, setMemberId] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [scanning, setScanning] = useState(false);
+    const [toasts, setToasts] = useState<ToastMsg[]>([]);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const scannerContainerId = "qr-scanner-container";
 
-    // Solo miembros activos pueden hacer check-in
     const activeMembers = members.filter((m) => m.membershipStatus === "active");
 
-    const loadAttendances = async () => {
+    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
+        const id = Date.now();
+        setToasts((p) => [...p, { id, text, type }]);
+        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+    }, []);
+
+    const loadAttendances = useCallback(async () => {
         const res = await getAttendances();
         setAttendances(res.data ?? []);
-    };
+    }, []);
 
     useSocketRefresh(["attendance_created"], loadAttendances);
 
@@ -82,10 +151,7 @@ export default function AttendancePage() {
         init();
     }, []);
 
-    useEffect(() => {
-        return () => { stopScanner(); };
-    }, []);
-
+    // Scanner effect
     useEffect(() => {
         if (!scanning) return;
         const el = document.getElementById(scannerContainerId);
@@ -109,19 +175,15 @@ export default function AttendancePage() {
                             addToast(`${member.firstName} ${member.lastName} no está activo`, "error");
                             return;
                         }
-                        await stopScanner();
-                        setScanToast(`Registrando a ${member.firstName} ${member.lastName}...`);
                         try {
                             await createAttendance(member.id);
                             addToast(`Entrada registrada — ${member.firstName} ${member.lastName}`);
                             loadAttendances();
                         } catch {
                             addToast("Error al registrar entrada", "error");
-                        } finally {
-                            setScanToast(null);
                         }
                     },
-                    () => { /* ignore scan errors */ }
+                    () => { }
                 );
             } catch {
                 if (!cancelled) {
@@ -131,42 +193,28 @@ export default function AttendancePage() {
             }
         })();
         return () => { cancelled = true; scanner.stop().catch(() => {}); };
-    }, [scanning]);
-
-    const addToast = (text: string, type: "success" | "error" = "success") => {
-        const id = Date.now();
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    };
-
-    const stopScanner = () => {
-        setScanning(false);
-    };
-
-    const startScanner = () => {
-        setShowForm(false);
-        setScanning(true);
-    };
+    }, [scanning, members, addToast, loadAttendances]);
 
     const clearForm = () => {
-        setMemberId(""); setShowForm(false);
+        setMemberId(""); setDrawerOpen(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!memberId) return;
         setSubmitting(true);
         try {
             await createAttendance(memberId);
+            addToast("Entrada registrada");
             clearForm();
             loadAttendances();
-        } catch (err) {
-            console.error(err);
+        } catch {
+            addToast("Error al registrar entrada", "error");
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Asistencias de hoy para el resumen
     const today = new Date().toDateString();
     const todayCount = attendances.filter(
         (a) => new Date(a.checkInAt).toDateString() === today
@@ -174,7 +222,16 @@ export default function AttendancePage() {
 
     return (
         <div style={s.page}>
-            {/* Toasts */}
+            <AttendanceDrawer
+                open={drawerOpen}
+                members={members}
+                submitting={submitting}
+                memberId={memberId}
+                onMemberChange={setMemberId}
+                onSubmit={handleSubmit}
+                onClose={clearForm}
+            />
+
             <div style={s.toastStack}>
                 {toasts.map((t) => (
                     <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
@@ -189,10 +246,10 @@ export default function AttendancePage() {
                 title="Asistencia"
                 action={
                     <div style={{ display: "flex", gap: 8 }}>
-                        <GymButton icon="ti-qrcode" onClick={startScanner} disabled={scanning}>
-                            {scanning ? "Escaneando..." : "Escanear QR"}
+                        <GymButton icon="ti-qrcode" onClick={() => { setDrawerOpen(false); setScanning((p) => !p); }}>
+                            {scanning ? "Detener escáner" : "Escanear QR"}
                         </GymButton>
-                        <GymButton icon="ti-login" onClick={() => { stopScanner(); clearForm(); setShowForm(true); }}>
+                        <GymButton icon="ti-login" onClick={() => { setScanning(false); setDrawerOpen(true); }}>
                             Registrar entrada
                         </GymButton>
                     </div>
@@ -200,8 +257,6 @@ export default function AttendancePage() {
             />
 
             <div style={s.content}>
-
-                {/* Resumen del día */}
                 <div style={s.summaryCard}>
                     <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Entradas hoy</p>
@@ -219,7 +274,6 @@ export default function AttendancePage() {
                     </div>
                 </div>
 
-                {/* Scanner QR */}
                 {scanning && (
                     <div style={s.card}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -227,73 +281,14 @@ export default function AttendancePage() {
                                 <p style={s.formTitle}>Escanear QR</p>
                                 <p style={s.formDesc}>Apunta al código QR del miembro para registrar su entrada.</p>
                             </div>
-                            <button style={s.btnCancel} onClick={stopScanner}>
+                            <button style={s.btnIcon} onClick={() => setScanning(false)}>
                                 <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
                             </button>
                         </div>
                         <div id={scannerContainerId} style={s.scannerContainer} />
-                        {scanToast && (
-                            <div style={s.scanToast}>
-                                <span style={s.spinner} /> {scanToast}
-                            </div>
-                        )}
                     </div>
                 )}
 
-                {/* Formulario de check-in */}
-                {showForm && !scanning && (
-                    <div style={s.card}>
-                        <p style={s.formTitle}>Registrar entrada</p>
-                        <p style={s.formDesc}>
-                            Selecciona el miembro que está ingresando al gimnasio.
-                            La hora se registra automáticamente.
-                        </p>
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ maxWidth: 360 }}>
-                                <Field label="Miembro *">
-                                    <select
-                                        style={s.input}
-                                        value={memberId}
-                                        onChange={(e) => setMemberId(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Seleccionar miembro</option>
-                                        {activeMembers.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.firstName} {m.lastName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-                            </div>
-
-                            {/* Preview de hora actual */}
-                            <div style={s.timePreview}>
-                                <i className="ti ti-clock" style={{ fontSize: 13, color: "#bbb" }} aria-hidden />
-                                <span style={{ fontSize: 12, color: "#888" }}>
-                                    Se registrará:{" "}
-                                    <strong style={{ color: "#1a1a1a" }}>
-                                        {new Date().toLocaleString("es-MX", {
-                                            day: "2-digit", month: "short", year: "numeric",
-                                            hour: "2-digit", minute: "2-digit",
-                                        })}
-                                    </strong>
-                                </span>
-                            </div>
-
-                            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                                <GymButton type="submit" disabled={submitting}>
-                                    {submitting ? "Registrando..." : "Confirmar entrada"}
-                                </GymButton>
-                                <GymButton type="button" variant="ghost" onClick={clearForm}>
-                                    Cancelar
-                                </GymButton>
-                            </div>
-                        </form>
-                    </div>
-                )}
-
-                {/* Tabla */}
                 {loading ? (
                     <p style={s.empty}>Cargando asistencias...</p>
                 ) : attendances.length === 0 ? (
@@ -338,17 +333,6 @@ export default function AttendancePage() {
     );
 }
 
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: "#888" }}>{label}</label>
-            {children}
-        </div>
-    );
-}
-
 const s: Record<string, React.CSSProperties> = {
     page:           { display: "flex", flexDirection: "column", minHeight: "100%" },
     content:        { padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 },
@@ -360,8 +344,6 @@ const s: Record<string, React.CSSProperties> = {
     card:           { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: 20, overflow: "hidden" },
     formTitle:      { fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 },
     formDesc:       { fontSize: 12, color: "#888", marginBottom: 16 },
-    input:          { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 12px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
-    timePreview:    { display: "flex", alignItems: "center", gap: 6, marginTop: 10, padding: "8px 12px", background: "#F7F7F6", borderRadius: 6, width: "fit-content" },
     table:          { width: "100%", borderCollapse: "collapse" },
     thead:          { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th:             { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
@@ -374,7 +356,18 @@ const s: Record<string, React.CSSProperties> = {
     toastStack:     { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
     toast:          { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     scannerContainer: { width: "100%", maxWidth: 400, minHeight: 250, margin: "0 auto", borderRadius: 8, overflow: "hidden" },
-    btnCancel:      { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
-    scanToast:      { display: "flex", alignItems: "center", gap: 8, justifyContent: "center", marginTop: 12, fontSize: 12, color: "#888" },
-    spinner:        { display: "inline-block", width: 14, height: 14, border: "2px solid #E5E4E2", borderTopColor: "#1a1a1a", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
+    spinner:        { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
+    // Drawer styles
+    overlay:        { position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.35)", transition: "opacity 0.2s ease" },
+    drawer:         { position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 900, width: 400, background: "#fff", borderLeft: "1px solid #E5E4E2", display: "flex", flexDirection: "column", transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)", boxShadow: "-4px 0 24px rgba(0,0,0,0.08)" },
+    drawerHeader:   { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
+    drawerTitle:    { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
+    drawerSub:      { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
+    drawerBody:     { flex: 1, overflowY: "auto", padding: "20px 24px" },
+    drawerFooter:   { display: "flex", gap: 8, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid #F0F0EE", flexShrink: 0, marginTop: 16 },
+    input:          { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const },
+    timePreview:    { display: "flex", alignItems: "center", gap: 6, marginTop: 10, padding: "8px 12px", background: "#F7F7F6", borderRadius: 6, width: "fit-content" },
+    btnIcon:        { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
+    btnPrimary:     { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
+    btnGhost:       { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
 };
