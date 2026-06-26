@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useToast } from "../hooks/useToast";
 import { createPayment, getPayments } from "../services/payment.service";
 import { getMembers } from "../services/member.service";
 import { getSubscriptions } from "../services/subscription.service";
@@ -36,22 +37,6 @@ const methodLabel: Record<string, string> = { cash: "Efectivo", card: "Tarjeta",
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
 const fmtDateTime = (d: string) => new Date(d).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}>
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
 
 function Field({ label, required, error, touched, children }: {
     label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
@@ -167,18 +152,11 @@ export default function PaymentsPage() {
     const [formValues, setFormValues] = useState({ ...emptyForm });
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const limit = 20;
-    const toastId = useRef(0);
-
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
+    const { addToast } = useToast();
 
     const memberSubscriptions = subscriptions.filter(
         (sub) => sub.member.id === formValues.memberId && sub.status === "active"
@@ -239,7 +217,6 @@ export default function PaymentsPage() {
 
     return (
         <div style={s.page}>
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
             <PaymentDrawer open={drawerOpen} saving={saving} values={formValues} errors={errors} touched={touched}
                 members={members} memberSubscriptions={memberSubscriptions}
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />

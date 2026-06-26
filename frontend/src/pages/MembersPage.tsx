@@ -9,6 +9,9 @@ import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { useToast } from "../hooks/useToast";
+import { useDebounce } from "../hooks/useDebounce";
+import ConfirmModal from "../components/ConfirmModal";
 
 interface Member {
     id: string;
@@ -57,46 +60,7 @@ const validate = (values: Record<string, string>): FormErrors => {
     return e;
 };
 
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
 
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}>
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
-
-function ConfirmModal({ open, title, body, confirmLabel, confirmColor, loading, onConfirm, onCancel }: {
-    open: boolean; title: string; body: string;
-    confirmLabel: string; confirmColor: string;
-    loading: boolean; onConfirm: () => void; onCancel: () => void;
-}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => { if (open) ref.current?.focus(); }, [open]);
-    if (!open) return null;
-    return (
-        <div style={s.overlay} onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} role="dialog" aria-modal>
-            <div ref={ref} tabIndex={-1} style={s.modal} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-                <p style={s.modalTitle}>{title}</p>
-                <p style={s.modalBody}>{body}</p>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-                    <button style={s.btnGhost} onClick={onCancel} disabled={loading}>Cancelar</button>
-                    <button style={{ ...s.btnConfirm, background: confirmColor, opacity: loading ? 0.7 : 1 }}
-                        onClick={onConfirm} disabled={loading}>
-                        {loading ? <span style={s.spinner} /> : confirmLabel}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 function Field({ label, required, error, touched, children }: {
     label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
@@ -330,6 +294,7 @@ export default function MembersPage() {
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [viewMember, setViewMember] = useState<Member | null>(null);
     const [search, setSearchState] = useState("");
+    const debouncedSearch = useDebounce(search);
     const [filterStatus, setFilterStatusState] = useState("");
     const [filterGender, setFilterGenderState] = useState("");
     const setSearch = (v: string) => { setSearchState(v); setPage(1); };
@@ -338,25 +303,19 @@ export default function MembersPage() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState<Member | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
+
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const limit = 20;
-    const toastId = useRef(0);
-
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
+    const { addToast } = useToast();
 
     const loadMembers = useCallback(async (targetPage: number) => {
-        const res = await getMembers(targetPage, limit, { search, status: filterStatus, gender: filterGender });
+        const res = await getMembers(targetPage, limit, { search: debouncedSearch, status: filterStatus, gender: filterGender });
         setMembers(res.data ?? []);
         setTotal(res.total ?? 0);
         setTotalPages(res.totalPages ?? 1);
-    }, [search, filterStatus, filterGender]);
+    }, [debouncedSearch, filterStatus, filterGender]);
 
     useSocketRefresh(["member_created", "member_updated", "member_deactivated"], () => loadMembers(page));
 
@@ -410,7 +369,7 @@ export default function MembersPage() {
 
     return (
         <div style={s.page}>
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
             <ConfirmModal open={confirmOpen} title={isDeactivating ? "Desactivar miembro" : "Activar miembro"}
                 body={isDeactivating ? `${confirmTarget?.firstName} ${confirmTarget?.lastName} perderá acceso al gimnasio.` : `${confirmTarget?.firstName} ${confirmTarget?.lastName} volverá a tener acceso activo.`}
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}

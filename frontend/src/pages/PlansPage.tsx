@@ -3,6 +3,9 @@ import { createPlan, getPlans, updatePlan } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { useToast } from "../hooks/useToast";
+import { useDebounce } from "../hooks/useDebounce";
+import ConfirmModal from "../components/ConfirmModal";
 
 interface Plan {
     id: string;
@@ -26,47 +29,6 @@ const statusStyle = (status: string): React.CSSProperties => {
 const statusLabel: Record<string, string> = {
     active: "Activo", inactive: "Inactivo",
 };
-
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}>
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
-
-function ConfirmModal({ open, title, body, confirmLabel, confirmColor, loading, onConfirm, onCancel }: {
-    open: boolean; title: string; body: string;
-    confirmLabel: string; confirmColor: string;
-    loading: boolean; onConfirm: () => void; onCancel: () => void;
-}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => { if (open) ref.current?.focus(); }, [open]);
-    if (!open) return null;
-    return (
-        <div style={s.overlay} onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} role="dialog" aria-modal>
-            <div ref={ref} tabIndex={-1} style={s.modal} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-                <p style={s.modalTitle}>{title}</p>
-                <p style={s.modalBody}>{body}</p>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-                    <button style={s.btnGhost} onClick={onCancel} disabled={loading}>Cancelar</button>
-                    <button style={{ ...s.btnConfirm, background: confirmColor, opacity: loading ? 0.7 : 1 }}
-                        onClick={onConfirm} disabled={loading}>
-                        {loading ? <span style={s.spinner} /> : confirmLabel}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 function Field({ label, required, error, touched, children }: {
     label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
@@ -161,27 +123,22 @@ export default function PlansPage() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState<Plan | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
-    const toastId = useRef(0);
+    const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search);
+    const { addToast } = useToast();
 
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
-
-    const loadPlans = async () => {
+    const loadPlans = useCallback(async () => {
         try {
-            const res = await getPlans();
+            const res = await getPlans(debouncedSearch);
             setPlans(res.data ?? []);
         } catch { setPlans([]); }
-    };
+    }, [debouncedSearch]);
 
     useSocketRefresh(["plan_created", "plan_updated", "plan_deactivated"], loadPlans);
 
     useEffect(() => {
         (async () => { try { await loadPlans(); } catch { setPlans([]); } finally { setLoading(false); } })();
-    }, []);
+    }, [loadPlans]);
 
     const openNew = () => { setEditingId(null); setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -227,7 +184,6 @@ export default function PlansPage() {
 
     return (
         <div style={s.page}>
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
             <ConfirmModal open={confirmOpen} title={isDeactivating ? "Desactivar plan" : "Activar plan"}
                 body={isDeactivating ? `El plan "${confirmTarget?.name}" dejará de estar disponible para nuevas suscripciones.` : `El plan "${confirmTarget?.name}" volverá a estar disponible.`}
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}
@@ -235,6 +191,13 @@ export default function PlansPage() {
             <PlanDrawer open={drawerOpen} editingId={editingId} saving={saving} values={formValues} errors={errors} touched={touched}
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Planes" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo plan</GymButton>} />
+            <div style={{ padding: "8px 28px 0" }}>
+                <div style={s.searchWrap}>
+                    <i className="ti ti-search" style={s.searchIcon} aria-hidden />
+                    <input style={s.searchInput} placeholder="Buscar plan…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                    {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                </div>
+            </div>
             <div style={s.content}>
                 {loading ? (
                     <p style={s.empty}>Cargando planes…</p>
@@ -278,12 +241,7 @@ export default function PlansPage() {
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
     content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
-    toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
-    toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
-    modal: { background: "#fff", borderRadius: 12, padding: "24px", width: 360, boxShadow: "0 8px 32px rgba(0,0,0,0.14)", outline: "none" },
-    modalTitle: { fontSize: 14, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" },
-    modalBody: { fontSize: 13, color: "#666", margin: 0, lineHeight: 1.5 },
     drawer: { position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 900, width: 420, background: "#fff", borderLeft: "1px solid #E5E4E2", display: "flex", flexDirection: "column", transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)", boxShadow: "-4px 0 24px rgba(0,0,0,0.08)" },
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
@@ -296,7 +254,6 @@ const s: Record<string, React.CSSProperties> = {
     inputError: { borderColor: "#fecaca" },
     btnPrimary: { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
-    btnConfirm: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", minWidth: 110 },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
     btnAction: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "6px 11px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
@@ -309,4 +266,8 @@ const s: Record<string, React.CSSProperties> = {
     muted: { color: "#888", fontSize: 12 },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
+    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 260px" },
+    searchIcon: { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 12, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
+    clearBtn: { background: "none", border: "none", position: "absolute", right: 8, cursor: "pointer", color: "#bbb", display: "flex", alignItems: "center", padding: 2, borderRadius: 4 },
 };

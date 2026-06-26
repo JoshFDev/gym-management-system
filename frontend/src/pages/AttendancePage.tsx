@@ -7,6 +7,8 @@ import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { useToast } from "../hooks/useToast";
+import { useDebounce } from "../hooks/useDebounce";
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 
@@ -30,8 +32,6 @@ interface ActiveMember {
     member: { id: string; fullName: string; email?: string; phone?: string };
     checkInAt: string;
 }
-
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
 
 const statusLabel: Record<string, string> = { checked_in: "Dentro", checked_out: "Completado" };
 const statusStyle: Record<string, React.CSSProperties> = {
@@ -280,13 +280,13 @@ export default function AttendancePage() {
     const [memberId, setMemberId] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [scanning, setScanning] = useState(false);
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [filterSearch, setFilterSearch] = useState("");
     const [filterGender, setFilterGender] = useState("");
     const [filterDate, setFilterDate] = useState("");
+    const debouncedSearch = useDebounce(filterSearch);
     const [reportOpen, setReportOpen] = useState(false);
     const [reportLoading, setReportLoading] = useState(false);
     const [reportData, setReportData] = useState<number[]>([]);
@@ -308,15 +308,11 @@ export default function AttendancePage() {
 
     const activeMembersList = members.filter((m) => m.membershipStatus === "active");
 
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = Date.now();
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
+    const { addToast } = useToast();
 
     const buildFilters = useCallback(() => {
         const f: Record<string, string> = {};
-        if (filterSearch) f.search = filterSearch;
+        if (debouncedSearch) f.search = debouncedSearch;
         if (filterGender) f.gender = filterGender;
         if (filterDate === "today") {
             const d = new Date();
@@ -334,7 +330,7 @@ export default function AttendancePage() {
             f.dateTo = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
         }
         return f;
-    }, [filterSearch, filterGender, filterDate]);
+    }, [debouncedSearch, filterGender, filterDate]);
 
     const loadAttendances = useCallback(async (targetPage: number) => {
         try {
@@ -491,16 +487,6 @@ export default function AttendancePage() {
 
             <ReportModal open={reportOpen} loading={reportLoading} data={reportData} labels={reportLabels}
                 period={reportPeriod} total={reportTotal} onPeriod={openReport} onClose={() => setReportOpen(false)} />
-
-            <div style={s.toastStack}>
-                {toasts.map((t) => (
-                    <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                        onClick={() => setToasts((p) => p.filter((x) => x.id !== t.id))}>
-                        <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                        {t.text}
-                    </div>
-                ))}
-            </div>
 
             <PageHeader title="Asistencia" action={
                 <div style={{ display: "flex", gap: 8 }}>
@@ -665,8 +651,6 @@ const s: Record<string, React.CSSProperties> = {
     badge:          { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     avatar:         { width: 28, height: 28, borderRadius: "50%", background: "#F0F0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "#666", flexShrink: 0 },
     empty:          { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
-    toastStack:     { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
-    toast:          { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     scannerContainer: { width: "100%", maxWidth: 400, minHeight: 250, margin: "0 auto", borderRadius: 8, overflow: "hidden" },
     spinner:        { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
     overlay:        { position: "fixed", inset: 0, zIndex: 800, background: "rgba(0,0,0,0.35)", transition: "opacity 0.2s ease" },

@@ -9,13 +9,15 @@
  * El endpoint registerRequest ya existe (se usaba antes para crear).
  */
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { registerRequest, forgotPasswordRequest } from "../services/auth.service";
 import { getUsers, updateUser, deleteUser } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import type { UserRole } from "../hooks/useAuth";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { useToast } from "../hooks/useToast";
+import ConfirmModal from "../components/ConfirmModal";
 
 // ─────────────────────────────────────────────
 // Constantes de rol
@@ -59,63 +61,6 @@ interface User {
 const initials = (f: string, l: string) => `${f?.[0] ?? ""}${l?.[0] ?? ""}`.toUpperCase();
 const fmtDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-// ─────────────────────────────────────────────
-// Toast
-// ─────────────────────────────────────────────
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div
-                    key={t.id}
-                    style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}
-                >
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
-
-// ─────────────────────────────────────────────
-// Confirm Modal
-// ─────────────────────────────────────────────
-function ConfirmModal({
-    open, title, body, confirmLabel, loading, onConfirm, onCancel,
-}: {
-    open: boolean; title: string; body: string;
-    confirmLabel: string; loading: boolean;
-    onConfirm: () => void; onCancel: () => void;
-}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => { if (open) ref.current?.focus(); }, [open]);
-    if (!open) return null;
-    return (
-        <div style={s.overlay} onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} role="dialog" aria-modal>
-            <div ref={ref} tabIndex={-1} style={s.modal} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-                <div style={s.modalIcon}>
-                    <i className="ti ti-trash" style={{ fontSize: 16, color: "#c0392b" }} aria-hidden />
-                </div>
-                <p style={s.modalTitle}>{title}</p>
-                <p style={s.modalBody}>{body}</p>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-                    <button style={s.btnGhost} onClick={onCancel} disabled={loading}>Cancelar</button>
-                    <button
-                        style={{ ...s.btnDanger, opacity: loading ? 0.7 : 1 }}
-                        onClick={onConfirm} disabled={loading}
-                    >
-                        {loading ? <span style={s.spinner} aria-label="Eliminando…" /> : confirmLabel}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 // ─────────────────────────────────────────────
 // Types
@@ -422,15 +367,7 @@ export default function UsersPage() {
     // Filtro rápido por rol
     const [filterRole, setFilterRole] = useState("");
 
-    // Toast
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
-    const toastId = useRef(0);
-
-    const addToast = (text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    };
+    const { addToast } = useToast();
 
     const loadUsers = async () => {
         try {
@@ -540,8 +477,6 @@ export default function UsersPage() {
 
     return (
         <div style={s.page}>
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
-
             <ConfirmModal
                 open={!!deleteTarget}
                 title="Eliminar usuario"
@@ -749,19 +684,6 @@ export default function UsersPage() {
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
     content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
-
-    toastStack: {
-        position: "fixed", top: 20, right: 20, zIndex: 9999,
-        display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none",
-    },
-    toast: {
-        display: "flex", alignItems: "center", gap: 8,
-        color: "#fff", fontSize: 12, fontWeight: 500,
-        padding: "9px 14px", borderRadius: 8,
-        animation: "fadeInDown 0.2s ease",
-        cursor: "pointer", pointerEvents: "all",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
-    },
 
     overlay: {
         position: "fixed", inset: 0, zIndex: 1000,

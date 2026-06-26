@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSubscriptions, createSubscription, renewSubscription } from "../services/subscription.service";
 import { getMembers } from "../services/member.service";
 import { getPlans } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
+import ConfirmModal from "../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { useToast } from "../hooks/useToast";
 
 interface Subscription {
     id: string;
@@ -43,47 +45,6 @@ const daysLeft = (endDate: Date | string) => {
     const diff = new Date(endDate).getTime() - Date.now();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };
-
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}>
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
-
-function ConfirmModal({ open, title, body, confirmLabel, loading, onConfirm, onCancel }: {
-    open: boolean; title: string; body: string;
-    confirmLabel: string; loading: boolean;
-    onConfirm: () => void; onCancel: () => void;
-}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useEffect(() => { if (open) ref.current?.focus(); }, [open]);
-    if (!open) return null;
-    return (
-        <div style={s.overlay} onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} role="dialog" aria-modal>
-            <div ref={ref} tabIndex={-1} style={s.modal} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
-                <p style={s.modalTitle}>{title}</p>
-                <p style={s.modalBody}>{body}</p>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-                    <button style={s.btnGhost} onClick={onCancel} disabled={loading}>Cancelar</button>
-                    <button style={{ ...s.btnConfirm, opacity: loading ? 0.7 : 1 }}
-                        onClick={onConfirm} disabled={loading}>
-                        {loading ? <span style={s.spinner} /> : confirmLabel}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 function Field({ label, required, error, touched, children }: {
     label: string; required?: boolean; error?: string; touched?: boolean; children: React.ReactNode;
@@ -173,18 +134,12 @@ export default function SubscriptionsPage() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
+
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const limit = 20;
-    const toastId = useRef(0);
-
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
+    const { addToast } = useToast();
 
     const load = async (targetPage: number) => {
         const res = await getSubscriptions(targetPage, limit);
@@ -246,7 +201,7 @@ export default function SubscriptionsPage() {
 
     return (
         <div style={s.page}>
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
             <ConfirmModal open={confirmOpen} title="Renovar suscripción"
                 body="¿Renovar esta suscripción? Se extenderá la fecha de vencimiento según los días del plan."
                 confirmLabel="Sí, renovar" loading={confirmLoading}

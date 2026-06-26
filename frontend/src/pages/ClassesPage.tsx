@@ -5,22 +5,8 @@ import type { UserResponse } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
-
-interface ToastMsg { id: number; text: string; type: "success" | "error" }
-
-function Toast({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
-    return (
-        <div style={s.toastStack}>
-            {toasts.map((t) => (
-                <div key={t.id} style={{ ...s.toast, background: t.type === "success" ? "#1a1a1a" : "#c0392b" }}
-                    onClick={() => onRemove(t.id)}>
-                    <i className={`ti ${t.type === "success" ? "ti-check" : "ti-alert-circle"}`} style={{ fontSize: 13 }} aria-hidden />
-                    {t.text}
-                </div>
-            ))}
-        </div>
-    );
-}
+import { useToast } from "../hooks/useToast";
+import ConfirmModal from "../components/ConfirmModal";
 
 const DAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -65,18 +51,12 @@ export default function ClassesPage() {
     const [confirmTarget, setConfirmTarget] = useState<ClassSchedule | null>(null);
     const [confirmMode, setConfirmMode] = useState<"deactivate" | "delete" | "reactivate">("deactivate");
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const [toasts, setToasts] = useState<ToastMsg[]>([]);
-    const toastId = useRef(0);
     const firstRef = useRef<HTMLInputElement>(null);
 
     const [filterStatus, setFilterStatus] = useState<string>("all");
     const [filterTrainer, setFilterTrainer] = useState<string>("");
 
-    const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
-        const id = ++toastId.current;
-        setToasts((p) => [...p, { id, text, type }]);
-        setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
-    }, []);
+    const { addToast } = useToast();
 
     const load = useCallback(async () => {
         try {
@@ -312,33 +292,21 @@ export default function ClassesPage() {
                 </div>
             </div>}
 
-            {confirmOpen && (
-                <div style={s.overlay} onClick={() => { if (!confirmLoading) { setConfirmOpen(false); setConfirmTarget(null); } }}>
-                    <div style={s.confirmBox} onClick={(e) => e.stopPropagation()}>
-                        <p style={s.confirmTitle}>
-                            {confirmMode === "deactivate" ? "Desactivar clase" : confirmMode === "reactivate" ? "Reactivar clase" : "Eliminar clase"}
-                        </p>
-                        <p style={s.confirmText}>
-                            {confirmMode === "deactivate"
-                                ? `¿Desactivar "${confirmTarget?.name}"?`
-                                : confirmMode === "reactivate"
-                                ? `¿Reactivar "${confirmTarget?.name}"?`
-                                : `¿Eliminar permanentemente "${confirmTarget?.name}"? Esta acción no se puede deshacer.`}
-                        </p>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                            <button style={s.cancelBtn} onClick={() => { setConfirmOpen(false); setConfirmTarget(null); }} disabled={confirmLoading}>Cancelar</button>
-                            <button style={{
-                                ...s.saveBtn,
-                                background: confirmMode === "delete" ? "#c0392b" : confirmMode === "reactivate" ? "#3a7d44" : "#888",
-                            }} onClick={handleConfirm} disabled={confirmLoading}>
-                                {confirmLoading ? "..." : confirmMode === "deactivate" ? "Desactivar" : confirmMode === "reactivate" ? "Reactivar" : "Eliminar"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                open={confirmOpen}
+                title={confirmMode === "deactivate" ? "Desactivar clase" : confirmMode === "reactivate" ? "Reactivar clase" : "Eliminar clase"}
+                body={confirmMode === "deactivate"
+                    ? `¿Desactivar "${confirmTarget?.name}"?`
+                    : confirmMode === "reactivate"
+                    ? `¿Reactivar "${confirmTarget?.name}"?`
+                    : `¿Eliminar permanentemente "${confirmTarget?.name}"? Esta acción no se puede deshacer.`}
+                confirmLabel={confirmMode === "deactivate" ? "Desactivar" : confirmMode === "reactivate" ? "Reactivar" : "Eliminar"}
+                confirmColor={confirmMode === "delete" ? "#c0392b" : confirmMode === "reactivate" ? "#3a7d44" : undefined}
+                loading={confirmLoading}
+                onConfirm={handleConfirm}
+                onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
+            />
 
-            <Toast toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
         </div>
     );
 }
@@ -365,9 +333,4 @@ const s: Record<string, React.CSSProperties> = {
     drawerFooter: { display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 20px", borderTop: "1px solid #E5E4E2" },
     cancelBtn: { padding: "7px 16px", borderRadius: 6, border: "1px solid #E5E4E2", background: "#fff", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" },
     saveBtn: { padding: "7px 16px", borderRadius: 6, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 },
-    confirmBox: { background: "#fff", borderRadius: 10, padding: "22px 24px", minWidth: 280, boxShadow: "0 6px 24px rgba(0,0,0,0.12)" },
-    confirmTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
-    confirmText: { fontSize: 13, color: "#555", margin: "8px 0 0" },
-    toastStack: { position: "fixed", bottom: 20, right: 20, display: "flex", flexDirection: "column", gap: 6, zIndex: 2000 },
-    toast: { display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 8, color: "#fff", fontSize: 12, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
 };
