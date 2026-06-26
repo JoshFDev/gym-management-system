@@ -3,6 +3,7 @@ import User from "./auth.model";
 import { RegisterInput, LoginInput, ChangePasswordInput } from "./auth.validation";
 import { ConflictError } from "../../shared/errors/ConflictError";
 import { UnauthorizedError } from "../../shared/errors/UnauthorizedError";
+import { BadRequestError } from "../../shared/errors/BadRequestError";
 import { generateToken } from "../../utils/jwt";
 import crypto from "crypto";
 import { sendMail } from "../../shared/utils/mail.util";
@@ -125,7 +126,7 @@ export const resetPassword = async (
     });
 
     if (!user) {
-        throw new Error(
+        throw new BadRequestError(
             "Invalid or expired reset token."
         );
     }
@@ -149,7 +150,7 @@ export const changePassword = async (
     const user = await User.findById(userId).select("+password");
 
     if (!user) {
-        throw new Error("User not found.");
+        throw new BadRequestError("User not found.");
     }
 
     const isMatch = await bcrypt.compare(data.currentPassword, user.password);

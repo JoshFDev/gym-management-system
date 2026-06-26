@@ -1,4 +1,5 @@
 import Member from "./member.model";
+import { MembershipStatus } from "./member.types";
 import { CreateMemberInput } from "./member.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 import { UpdateMemberInput } from "./member.validation";
@@ -78,7 +79,7 @@ export const deactivateMember = async (
     const member = await Member.findByIdAndUpdate(
         id,
         {
-            membershipStatus: "inactive",
+            membershipStatus: MembershipStatus.INACTIVE,
         },
         {
             returnDocument: "after",

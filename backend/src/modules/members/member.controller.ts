@@ -10,13 +10,13 @@ export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
         const member = await createMember(req.body);
 
-        await logAudit({
+        logAudit({
             action: "CREATE",
             entity: "Member",
             entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
-        });
+        }).catch(() => {});
 
         notifyAll({
             type: "member_created",
@@ -68,14 +68,14 @@ export const update = asyncHandler(
     async (req: AuthRequest, res: Response) => {
         const member = await updateMember(req.params.id as string, req.body);
 
-        await logAudit({
+        logAudit({
             action: "UPDATE",
             entity: "Member",
             entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
             changes: req.body,
-        });
+        }).catch(() => {});
 
         notifyAll({
             type: "member_updated",
@@ -96,14 +96,14 @@ export const deactivate = asyncHandler(
     async (req: AuthRequest, res: Response) => {
         const member = await deactivateMember(req.params.id as string);
 
-        await logAudit({
+        logAudit({
             action: "DELETE",
             entity: "Member",
             entityId: member._id.toString(),
             userId: req.user!.userId,
             userRole: req.user!.role,
             changes: { membershipStatus: "inactive" },
-        });
+        }).catch(() => {});
 
         notifyAll({
             type: "member_deactivated",

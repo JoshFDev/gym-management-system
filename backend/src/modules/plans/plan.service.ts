@@ -1,4 +1,5 @@
 import Plan from "./plan.model";
+import { PlanStatus } from "./plan.types";
 
 import {
     CreatePlanInput,
@@ -82,7 +83,7 @@ export const deactivatePlan = async (
     const plan = await Plan.findByIdAndUpdate(
         id,
         {
-            status: "inactive",
+            status: PlanStatus.INACTIVE,
         },
         {
             returnDocument: "after",
