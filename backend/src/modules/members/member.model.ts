@@ -1,10 +1,12 @@
 import { Schema, model, Document } from "mongoose";
+import bcrypt from "bcrypt";
 import { MembershipStatus } from "./member.types";
 
 export interface IMember extends Document {
     firstName: string;
     lastName: string;
     email?: string;
+    password?: string;
     phone: string;
     birthDate?: Date;
     gender?: string;
@@ -35,6 +37,11 @@ const memberSchema = new Schema<IMember>(
             type: String,
             trim: true,
             lowercase: true,
+        },
+
+        password: {
+            type: String,
+            select: false,
         },
 
         phone: {
@@ -71,8 +78,20 @@ const memberSchema = new Schema<IMember>(
     },
     {
         timestamps: true,
+        toJSON: {
+            transform(_doc, ret) {
+                delete ret.password;
+                return ret;
+            },
+        },
     }
 );
+
+memberSchema.pre("save", async function () {
+    if (!this.isModified("password") || !this.password) return;
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+});
 
 const Member = model<IMember>(
     "Member",

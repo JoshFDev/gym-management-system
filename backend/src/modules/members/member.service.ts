@@ -57,21 +57,16 @@ export const updateMember = async (
     id: string,
     data: UpdateMemberInput
 ) => {
-
-    const member = await Member.findByIdAndUpdate(
-        id,
-        data,
-        {
-            returnDocument: "after",
-            runValidators: true,
-        }
-    );
+    const member = await Member.findById(id);
 
     if (!member) {
         throw new NotFoundError(
             "Member not found."
         );
     }
+
+    Object.assign(member, data);
+    await member.save();
 
     return member;
 };

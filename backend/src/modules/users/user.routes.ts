@@ -17,7 +17,7 @@ const router = Router();
 router.get(
     "/",
     authenticate,
-    authorize("admin"),
+    authorize("admin", "receptionist", "trainer"),
     getAll
 );
 

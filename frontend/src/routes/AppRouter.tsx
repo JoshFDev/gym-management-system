@@ -6,6 +6,7 @@ import DashboardPage from "../pages/DashboardPage";
 import MembersPage from "../pages/MembersPage";
 import MemberProfilePage from "../pages/MemberProfilePage";
 import PlansPage from "../pages/PlansPage";
+import ClassesPage from "../pages/ClassesPage";
 import SubscriptionsPage from "../pages/SubscriptionsPage";
 import AttendancePage from "../pages/AttendancePage";
 import PaymentsPage from "../pages/PaymentsPage";
@@ -54,6 +55,12 @@ export default function AppRouter() {
                     <Route path="/plans" element={
                         <ProtectedRoute allowedRoles={["admin"]}>
                             <PlansPage />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/classes" element={
+                        <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
+                            <ClassesPage />
                         </ProtectedRoute>
                     } />
 

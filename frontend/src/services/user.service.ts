@@ -23,8 +23,9 @@ export interface UpdateUserData {
     isActive?: boolean;
 }
 
-export const getUsers = async () => {
-    const response = await api.get("/users");
+export const getUsers = async (role?: string) => {
+    const params = role ? { role } : {};
+    const response = await api.get("/users", { params });
 
     return response.data;
 };

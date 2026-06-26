@@ -19,6 +19,7 @@ interface CreateMemberData {
     firstName: string;
     lastName: string;
     email?: string;
+    password?: string;
     phone: string;
     gender?: string;
     birthDate?: string;
@@ -30,6 +31,7 @@ interface UpdateMemberData {
     firstName?: string;
     lastName?: string;
     email?: string;
+    password?: string;
     phone?: string;
     gender?: string;
     birthDate?: string;

@@ -42,6 +42,8 @@ export default function AuditLogPage() {
         try {
             const res = await getAuditLogs();
             setLogs(res.data ?? []);
+        } catch {
+            setLogs([]);
         } finally {
             setLoading(false);
         }

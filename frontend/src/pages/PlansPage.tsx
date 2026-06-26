@@ -141,9 +141,9 @@ const validate = (values: Record<string, string>): FormErrors => {
     if (!values.name.trim()) e.name = "Obligatorio";
     else if (values.name.trim().length < 2) e.name = "Mínimo 2 caracteres";
     if (!values.price.trim()) e.price = "Obligatorio";
-    else if (Number(values.price) <= 0) e.price = "Debe ser mayor a 0";
+    else if (isNaN(Number(values.price)) || Number(values.price) <= 0) e.price = "Debe ser un número mayor a 0";
     if (!values.durationDays.trim()) e.durationDays = "Obligatorio";
-    else if (Number(values.durationDays) <= 0) e.durationDays = "Debe ser mayor a 0";
+    else if (isNaN(Number(values.durationDays)) || Number(values.durationDays) <= 0) e.durationDays = "Debe ser un número mayor a 0";
     return e;
 };
 
@@ -171,14 +171,16 @@ export default function PlansPage() {
     }, []);
 
     const loadPlans = async () => {
-        const res = await getPlans();
-        setPlans(res.data ?? []);
+        try {
+            const res = await getPlans();
+            setPlans(res.data ?? []);
+        } catch { setPlans([]); }
     };
 
     useSocketRefresh(["plan_created", "plan_updated", "plan_deactivated"], loadPlans);
 
     useEffect(() => {
-        (async () => { try { await loadPlans(); } finally { setLoading(false); } })();
+        (async () => { try { await loadPlans(); } catch { setPlans([]); } finally { setLoading(false); } })();
     }, []);
 
     const openNew = () => { setEditingId(null); setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };

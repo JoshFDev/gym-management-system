@@ -433,14 +433,16 @@ export default function UsersPage() {
     };
 
     const loadUsers = async () => {
-        const res = await getUsers();
-        setUsers(res.data ?? []);
+        try {
+            const res = await getUsers();
+            setUsers(res.data ?? []);
+        } catch { setUsers([]); }
     };
 
     useSocketRefresh(["user_updated", "user_deactivated"], loadUsers);
 
     useEffect(() => {
-        (async () => { try { await loadUsers(); } finally { setLoading(false); } })();
+        (async () => { try { await loadUsers(); } catch { setUsers([]); } finally { setLoading(false); } })();
     }, []);
 
     // Filtrado

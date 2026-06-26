@@ -150,7 +150,7 @@ const validate = (values: Record<string, string>): FormErrors => {
     if (!values.memberId) e.memberId = "Selecciona un miembro";
     if (!values.subscriptionId) e.subscriptionId = "Selecciona una suscripción";
     if (!values.amount.trim()) e.amount = "Obligatorio";
-    else if (Number(values.amount) <= 0) e.amount = "Debe ser mayor a 0";
+    else if (isNaN(Number(values.amount)) || Number(values.amount) <= 0) e.amount = "Debe ser un número mayor a 0";
     if (!values.method) e.method = "Selecciona un método";
     return e;
 };

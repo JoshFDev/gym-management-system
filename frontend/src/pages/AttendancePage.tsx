@@ -296,6 +296,9 @@ export default function AttendancePage() {
     const limit = 20;
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const cooldownRef = useRef(false);
+    const loadRef = useRef<(p: number) => void>(() => {});
+    const loadActiveRef = useRef<() => void>(() => {});
+    const pageRef = useRef(page);
     const scannerContainerId = "qr-scanner-container";
 
     const setSearch = (v: string) => { setFilterSearch(v); setPage(1); };
@@ -334,11 +337,13 @@ export default function AttendancePage() {
     }, [filterSearch, filterGender, filterDate]);
 
     const loadAttendances = useCallback(async (targetPage: number) => {
-        const f = buildFilters();
-        const res = await getAttendances(targetPage, limit, f);
-        setAttendances(res.data ?? []);
-        setTotal(res.total ?? 0);
-        setTotalPages(res.totalPages ?? 1);
+        try {
+            const f = buildFilters();
+            const res = await getAttendances(targetPage, limit, f);
+            setAttendances(res.data ?? []);
+            setTotal(res.total ?? 0);
+            setTotalPages(res.totalPages ?? 1);
+        } catch { /* handled by caller */ }
     }, [buildFilters]);
 
     const loadActiveMembers = useCallback(async () => {
@@ -347,6 +352,10 @@ export default function AttendancePage() {
             setActiveMembers(res.data ?? []);
         } catch { /* ignore */ }
     }, []);
+
+    useEffect(() => { loadRef.current = loadAttendances; }, [loadAttendances]);
+    useEffect(() => { loadActiveRef.current = loadActiveMembers; }, [loadActiveMembers]);
+    useEffect(() => { pageRef.current = page; }, [page]);
 
     useSocketRefresh(["attendance_created"], () => { loadAttendances(page); loadActiveMembers(); });
 
@@ -405,8 +414,8 @@ export default function AttendancePage() {
                             addToast(isCheckOut
                                 ? `Salida registrada: ${member.firstName} ${member.lastName}`
                                 : `Entrada registrada: ${member.firstName} ${member.lastName}`);
-                            loadAttendances(page);
-                            loadActiveMembers();
+                            loadRef.current(pageRef.current);
+                            loadActiveRef.current();
                         } catch {
                             addToast("Error al registrar", "error");
                         }
@@ -421,7 +430,7 @@ export default function AttendancePage() {
             }
         })();
         return () => { cancelled = true; scanner.stop().catch(() => {}); };
-    }, [scanning, members, addToast, loadAttendances, page, loadActiveMembers]);
+    }, [scanning, members, addToast]);
 
     const clearForm = () => { setMemberId(""); setDrawerOpen(false); };
 

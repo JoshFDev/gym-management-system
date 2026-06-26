@@ -16,6 +16,11 @@ export const createMemberSchema = z.object({
         .email("Invalid email address.")
         .optional(),
 
+    password: z
+        .string()
+        .min(6, "Password must be at least 6 characters.")
+        .optional(),
+
     phone: z
         .string()
         .trim()

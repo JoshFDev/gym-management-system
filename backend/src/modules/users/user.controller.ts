@@ -1,13 +1,15 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
 import { getUsers, updateUser, deleteUser } from "./user.service";
+import { UserRole } from "../auth/auth.types";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAdmins } from "../../shared/services/socket.service";
 
 export const getAll = asyncHandler(
-    async (_req: Request, res: Response) => {
-        const users = await getUsers();
+    async (req: Request, res: Response) => {
+        const role = req.query.role as UserRole | undefined;
+        const users = await getUsers(role);
         res.status(200).json({
             success: true,
             data: users.map((user) => ({

@@ -14,8 +14,9 @@ interface UpdateUserData {
     isActive?: boolean;
 }
 
-export const getUsers = async () => {
-    const users = await User.find()
+export const getUsers = async (role?: UserRole) => {
+    const filter = role ? { role } : {};
+    const users = await User.find(filter)
         .sort({ createdAt: -1 });
 
     return users;

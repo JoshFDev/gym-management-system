@@ -53,6 +53,7 @@ const validate = (values: Record<string, string>): FormErrors => {
     if (!values.phone.trim()) e.phone = "Obligatorio";
     else if (values.phone.replace(/\D/g, "").length < 10) e.phone = "Formato: XX-XXXX-XXXX";
     if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) e.email = "Correo inválido";
+    if (values.password && values.password.length < 6) e.password = "Mínimo 6 caracteres";
     return e;
 };
 
@@ -170,6 +171,11 @@ function MemberDrawer({ open, editingId, saving, values, errors, touched, onChan
                         <input style={{ ...s.input, ...(touched.email && errors.email ? s.inputError : {}) }}
                             type="email" placeholder="correo@ejemplo.com" value={values.email}
                             onChange={(e) => onChange("email", e.target.value)} onBlur={() => onBlur("email")} />
+                    </Field>
+                    <Field label="Contraseña" error={errors.password} touched={touched.password}>
+                        <input style={{ ...s.input, ...(touched.password && errors.password ? s.inputError : {}) }}
+                            type="password" placeholder="••••••••" value={values.password}
+                            onChange={(e) => onChange("password", e.target.value)} onBlur={() => onBlur("password")} />
                     </Field>
                     <Field label="Dirección">
                         <input style={s.input} placeholder="Calle, colonia, ciudad..." value={values.address} onChange={(e) => onChange("address", e.target.value)} />
@@ -311,7 +317,7 @@ function exportPDF(members: Member[]) {
     doc.save(`ZenithGym_Miembros_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-const emptyForm = { firstName: "", lastName: "", email: "", phone: "", gender: "", birthDate: "", address: "", emergencyContact: "", notes: "" };
+const emptyForm = { firstName: "", lastName: "", email: "", password: "", phone: "", gender: "", birthDate: "", address: "", emergencyContact: "", notes: "" };
 
 export default function MembersPage() {
     const [members, setMembers] = useState<Member[]>([]);
@@ -354,7 +360,7 @@ export default function MembersPage() {
 
     useSocketRefresh(["member_created", "member_updated", "member_deactivated"], () => loadMembers(page));
 
-    useEffect(() => { (async () => { try { await loadMembers(page); } finally { setLoading(false); } })(); }, [loadMembers, page]);
+    useEffect(() => { (async () => { try { await loadMembers(page); } catch { /* handled in loadMembers */ } finally { setLoading(false); } })(); }, [loadMembers, page]);
 
     const hasFilters = search || filterStatus || filterGender;
     const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterGender(""); };
@@ -363,7 +369,7 @@ export default function MembersPage() {
 
     const openEdit = (m: Member) => {
         setEditingId(m.id);
-        setFormValues({ firstName: m.firstName, lastName: m.lastName, email: m.email ?? "", phone: m.phone, gender: m.gender ?? "", birthDate: m.birthDate ? m.birthDate.slice(0, 10) : "", address: m.address ?? "", emergencyContact: m.emergencyContact ?? "", notes: m.notes ?? "" });
+        setFormValues({ firstName: m.firstName, lastName: m.lastName, email: m.email ?? "", password: "", phone: m.phone, gender: m.gender ?? "", birthDate: m.birthDate ? m.birthDate.slice(0, 10) : "", address: m.address ?? "", emergencyContact: m.emergencyContact ?? "", notes: m.notes ?? "" });
         setErrors({}); setTouched({}); setDrawerOpen(true);
     };
 
@@ -381,8 +387,8 @@ export default function MembersPage() {
         if (Object.keys(validation).length > 0) return;
         setSaving(true);
         try {
-            const { firstName, lastName, email, phone, gender, birthDate, address, emergencyContact, notes } = formValues;
-            const data = { firstName, lastName, phone, ...(email && { email }), ...(gender && { gender }), ...(birthDate && { birthDate }), ...(address && { address }), ...(emergencyContact && { emergencyContact }), ...(notes && { notes }) };
+            const { firstName, lastName, email, password, phone, gender, birthDate, address, emergencyContact, notes } = formValues;
+            const data = { firstName, lastName, phone, ...(email && { email }), ...(password && { password }), ...(gender && { gender }), ...(birthDate && { birthDate }), ...(address && { address }), ...(emergencyContact && { emergencyContact }), ...(notes && { notes }) };
             if (editingId) { await updateMember(editingId, data); addToast("Miembro actualizado"); }
             else { await createMember(data); addToast("Miembro creado correctamente"); }
             setDrawerOpen(false); await loadMembers(page);

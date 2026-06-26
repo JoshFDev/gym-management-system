@@ -54,6 +54,7 @@ type NotificationType =
     | "subscription_created" | "subscription_renewed"
     | "payment_created"
     | "attendance_created"
+    | "class_created" | "class_updated" | "class_deactivated"
     | "info";
 
 interface NotificationPayload {

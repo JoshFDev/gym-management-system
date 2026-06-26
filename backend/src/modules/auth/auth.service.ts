@@ -43,9 +43,6 @@ export const loginUser = async (
         })
         .select("+password");
 
-    console.log("Email recibido:", data.email);
-    console.log("Usuario encontrado:", user);
-
     if (!user) {
         throw new UnauthorizedError("Invalid email or password.");
     }
@@ -55,23 +52,18 @@ export const loginUser = async (
         user.password
     );
 
-    console.log("Password coincide:", passwordMatch);
-
     if (!passwordMatch) {
         throw new UnauthorizedError("Invalid email or password.");
     }
 
     user.lastLogin = new Date();
-    console.log("1. lastLogin asignado");
 
     await user.save();
-    console.log("2. Usuario guardado");
 
     const token = generateToken({
         userId: user._id.toString(),
         role: user.role,
     });
-    console.log("3. Token generado");
 
     return {
         token,

@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
     { to: "/dashboard",    icon: "ti-layout-dashboard", label: "Dashboard",     roles: ["admin", "receptionist"] },
     { to: "/members",      icon: "ti-users",            label: "Miembros",      roles: ["admin", "receptionist", "trainer"] },
     { to: "/plans",        icon: "ti-clipboard-list",   label: "Planes",        roles: ["admin"] },
+    { to: "/classes",      icon: "ti-calendar",         label: "Clases",        roles: ["admin", "receptionist", "trainer"] },
     { to: "/subscriptions",icon: "ti-id-badge",         label: "Suscripciones", roles: ["admin", "receptionist"] },
     { to: "/payments",     icon: "ti-credit-card",      label: "Pagos",         roles: ["admin", "receptionist"] },
     { to: "/attendance",   icon: "ti-scan",             label: "Asistencia",    roles: ["admin", "receptionist", "trainer"] },
