@@ -6,17 +6,17 @@ export function useSocketRefresh(
     onRefresh: () => void
 ) {
     const savedCallback = useRef(onRefresh);
+    const savedEvents = useRef(eventTypes);
 
     useEffect(() => { savedCallback.current = onRefresh; });
+    useEffect(() => { savedEvents.current = eventTypes; });
 
-    const deps = eventTypes.join(",");
     useEffect(() => {
         const unsub = onNotification((data: NotificationPayload) => {
-            if (eventTypes.includes(data.type)) {
+            if (savedEvents.current.includes(data.type)) {
                 savedCallback.current();
             }
         });
         return unsub;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deps]);
+    }, []);
 }

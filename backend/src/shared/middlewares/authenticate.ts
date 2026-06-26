@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import User from "../../modules/auth/auth.model";
 
 import { verifyToken } from "../../utils/jwt";
 import { UnauthorizedError } from "../errors/UnauthorizedError";
@@ -10,11 +11,11 @@ export interface AuthRequest extends Request {
     };
 }
 
-export const authenticate = (
+export const authenticate = async (
     req: AuthRequest,
     _res: Response,
     next: NextFunction
-): void => {
+): Promise<void> => {
 
     const authHeader = req.headers.authorization;
 
@@ -34,9 +35,16 @@ export const authenticate = (
 
     const payload = verifyToken(token);
 
+    const user = await User.findById(payload.userId).select("isActive role");
+    if (!user || !user.isActive) {
+        throw new UnauthorizedError(
+            "User account is inactive."
+        );
+    }
+
     req.user = {
         userId: payload.userId,
-        role: payload.role,
+        role: user.role,
     };
 
     next();
