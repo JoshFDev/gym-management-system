@@ -11,6 +11,7 @@ export interface AttendanceResponse {
     };
 
     checkInAt: Date;
+    checkOutAt?: Date;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -30,6 +31,7 @@ export const toAttendanceResponse = (
     },
 
     checkInAt: attendance.checkInAt,
+    checkOutAt: attendance.checkOutAt ?? undefined,
     status: attendance.status,
     createdAt: attendance.createdAt,
     updatedAt: attendance.updatedAt,

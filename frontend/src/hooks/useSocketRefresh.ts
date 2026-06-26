@@ -6,8 +6,10 @@ export function useSocketRefresh(
     onRefresh: () => void
 ) {
     const savedCallback = useRef(onRefresh);
-    savedCallback.current = onRefresh;
 
+    useEffect(() => { savedCallback.current = onRefresh; });
+
+    const deps = eventTypes.join(",");
     useEffect(() => {
         const unsub = onNotification((data: NotificationPayload) => {
             if (eventTypes.includes(data.type)) {
@@ -15,5 +17,6 @@ export function useSocketRefresh(
             }
         });
         return unsub;
-    }, [eventTypes.join(",")]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [deps]);
 }

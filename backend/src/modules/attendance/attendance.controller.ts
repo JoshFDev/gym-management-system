@@ -4,6 +4,7 @@ import {
     createAttendance,
     getAttendances,
     getAttendanceReport,
+    getActiveAttendances,
 } from "./attendance.service";
 
 import { toAttendanceResponse } from "./attendance.dto";
@@ -14,21 +15,22 @@ import { notifyAll } from "../../shared/services/socket.service";
 export const create = asyncHandler(
     async (req: Request, res: Response) => {
 
-        const attendance = await createAttendance(
+        const { attendance, action } = await createAttendance(
             req.body
         );
 
         notifyAll({
             type: "attendance_created",
-            title: "Entrada registrada",
-            message: "Nuevo check-in registrado",
+            title: action === "check_out" ? "Salida registrada" : "Entrada registrada",
+            message: action === "check_out" ? "Check-out registrado" : "Nuevo check-in registrado",
             timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({
             success: true,
-            message: "Attendance registered successfully.",
+            message: action === "check_out" ? "Check-out registered." : "Check-in registered.",
             data: toAttendanceResponse(attendance),
+            action,
         });
 
     }
@@ -56,6 +58,13 @@ export const getAll = asyncHandler(
             totalPages: result.totalPages,
         });
 
+    }
+);
+
+export const getActive = asyncHandler(
+    async (_req: Request, res: Response) => {
+        const data = await getActiveAttendances();
+        res.status(200).json({ success: true, data });
     }
 );
 

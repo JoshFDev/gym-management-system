@@ -26,8 +26,8 @@ export default function FloatingQrScanner() {
                         setTimeout(() => { cooldownRef.current = false; }, 5000);
                         setToast(`Registrando...`);
                         try {
-                            await createAttendance(decodedText);
-                            setToast("Entrada registrada ✓");
+                            const res = await createAttendance(decodedText);
+                            setToast(res.action === "check_out" ? "Salida registrada ✓" : "Entrada registrada ✓");
                             setTimeout(() => setToast(null), 2000);
                         } catch {
                             setToast("Error al registrar");

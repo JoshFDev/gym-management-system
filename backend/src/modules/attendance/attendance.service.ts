@@ -1,27 +1,43 @@
 import Member from "../members/member.model";
-import Attendance from "./attendance.model";
+import Attendance, { IAttendance } from "./attendance.model";
 import { paginate } from "../../shared/utils/pagination";
+import { AttendanceStatus } from "./attendance.types";
 
 import { CreateAttendanceInput } from "./attendance.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 
-export const createAttendance = async (
-    data: CreateAttendanceInput
-) => {
-
+export const createAttendance = async (data: CreateAttendanceInput) => {
     const member = await Member.findById(data.memberId);
+    if (!member) throw new NotFoundError("Member not found.");
 
-    if (!member) {
-        throw new NotFoundError(
-            "Member not found."
-        );
-    }
+    // Find active check-in today (no check-out)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    const attendance = await Attendance.create({
+    const existing = await Attendance.findOne({
         memberId: member._id,
+        checkInAt: { $gte: todayStart, $lte: todayEnd },
+        checkOutAt: null,
     });
 
-    return attendance;
+    if (existing) {
+        // Check-out
+        existing.checkOutAt = new Date();
+        existing.status = AttendanceStatus.CHECKED_OUT;
+        await existing.save();
+        return { attendance: existing, action: "check_out" };
+    }
+
+    // Check-in
+    const attendance = await Attendance.create({
+        memberId: member._id,
+        checkInAt: new Date(),
+        status: AttendanceStatus.CHECKED_IN,
+    });
+
+    return { attendance, action: "check_in" };
 };
 
 interface AttendanceFilters {
@@ -76,6 +92,31 @@ export const getAttendances = async (page: number = 1, limit: number = 20, filte
     );
 
     return result;
+};
+
+export const getActiveAttendances = async () => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const records = await Attendance.find({
+        checkInAt: { $gte: todayStart, $lte: todayEnd },
+        checkOutAt: null,
+    })
+        .populate<{ memberId: { _id: any; firstName: string; lastName: string; email?: string; phone?: string } }>("memberId", "firstName lastName email phone gender")
+        .sort({ checkInAt: -1 });
+
+    return records.map((r) => ({
+        id: r._id.toString(),
+        member: {
+            id: r.memberId._id.toString(),
+            fullName: `${r.memberId.firstName} ${r.memberId.lastName}`,
+            email: r.memberId.email,
+            phone: r.memberId.phone,
+        },
+        checkInAt: r.checkInAt,
+    }));
 };
 
 export const getAttendanceReport = async (dateFrom: string, dateTo: string) => {

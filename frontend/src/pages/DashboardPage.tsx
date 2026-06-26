@@ -7,7 +7,7 @@ import { getDashboardStats } from "../services/dashboard.service";
 import { getMembers } from "../services/member.service";
 import { getPayments } from "../services/payment.service";
 //import { getPlans } from "../services/plan.service";
-import { getAttendances } from "../services/attendance.service";
+import { getAttendances, getActiveAttendances } from "../services/attendance.service";
 
 Chart.register(...registerables);
 
@@ -33,6 +33,11 @@ interface Payment {
 
 interface Attendance {
     id: string; checkInAt: string;
+}
+interface ActiveMember {
+    id: string;
+    member: { id: string; fullName: string; email?: string; phone?: string };
+    checkInAt: string;
 }
 
 const fmtCurrency = (n: number) =>
@@ -179,6 +184,8 @@ export default function DashboardPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [weekData, setWeekData] = useState<{ day: string; count: number; revenue: number }[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeMembers, setActiveMembers] = useState<ActiveMember[]>([]);
+    const [statusFilter, setStatusFilter] = useState<"todos" | "gym" | "fuera">("todos");
 
     useEffect(() => {
         const load = async () => {
@@ -188,16 +195,19 @@ export default function DashboardPage() {
                     membersRes,
                     paymentsRes,
                     attendanceRes,
+                    activeRes,
                 ] = await Promise.all([
                     getDashboardStats(),
                     getMembers(),
                     getPayments(),
                     getAttendances(),
+                    getActiveAttendances(),
                 ]);
                 setStats(statsRes.data);
                 setMembers((membersRes.data ?? []).slice(0, 4));
                 setPayments((paymentsRes.data ?? []).slice(0, 3));
                 setWeekData(buildWeekData(attendanceRes.data ?? [], paymentsRes.data ?? []));
+                setActiveMembers(activeRes.data ?? []);
             } catch (err) {
                 console.error("Dashboard error:", err);
             } finally {
@@ -323,34 +333,73 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {/* Miembros recientes */}
+                    {/* Estado de miembros */}
                     <div style={s.card}>
-                        <p style={s.cardTitle}>Miembros recientes</p>
-                        <div style={{ marginTop: 10 }}>
-                            {members.length === 0 ? (
-                                <p style={s.empty}>Sin miembros.</p>
-                            ) : members.map((m) => (
-                                <div key={m.id} style={s.listRow}>
-                                    <div style={{
-                                        ...s.avatar,
-                                        background: m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE",
-                                        color: m.membershipStatus === "inactive" ? "#c0392b" : "#666",
-                                    }}>
-                                        {initials(m.firstName, m.lastName)}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                            <div>
+                                <p style={s.cardTitle}>Estado de miembros</p>
+                                <p style={s.cardSub}>Filtra por ubicación actual</p>
+                            </div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                                {(["todos", "gym", "fuera"] as const).map((opt) => (
+                                    <button
+                                        key={opt}
+                                        onClick={() => setStatusFilter(opt)}
+                                        style={{
+                                            ...s.filterBtn,
+                                            background: statusFilter === opt ? "#1a1a1a" : "#F7F7F6",
+                                            color: statusFilter === opt ? "#fff" : "#666",
+                                        }}
+                                    >
+                                        {opt === "todos" ? "Todos" : opt === "gym" ? "En el gym" : "Fuera"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                            {statusFilter === "gym" ? (
+                                activeMembers.length === 0 ? (
+                                    <p style={s.empty}>Nadie en el gimnasio ahora.</p>
+                                ) : activeMembers.map((a: ActiveMember) => (
+                                    <div key={a.id} style={s.listRow}>
+                                        <div style={{ ...s.avatar, background: "#F0F7F1", color: "#3a7d44" }}>
+                                            {initials(a.member.fullName.split(" ")[0], a.member.fullName.split(" ")[1] ?? "")}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={s.listName}>{a.member.fullName}</p>
+                                            <p style={s.listSub}>Desde {new Date(a.checkInAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</p>
+                                        </div>
+                                        <span style={{ ...s.badge, background: "#F0F7F1", color: "#3a7d44" }}>
+                                            En el gym
+                                        </span>
                                     </div>
-                                    <div style={{ flex: 1 }}>
-                                        <p style={s.listName}>{m.firstName} {m.lastName}</p>
-                                        {m.planName && <p style={s.listSub}>{m.planName}</p>}
+                                ))
+                            ) : (
+                                members.length === 0 ? (
+                                    <p style={s.empty}>Sin miembros.</p>
+                                ) : members.map((m) => (
+                                    <div key={m.id} style={s.listRow}>
+                                        <div style={{
+                                            ...s.avatar,
+                                            background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE",
+                                            color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "inactive" ? "#c0392b" : "#666",
+                                        }}>
+                                            {initials(m.firstName, m.lastName)}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={s.listName}>{m.firstName} {m.lastName}</p>
+                                            {m.planName && <p style={s.listSub}>{m.planName}</p>}
+                                        </div>
+                                        <span style={{
+                                            ...s.badge,
+                                            background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "active" ? "#E5E4E2" : "#FFF4F0",
+                                            color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "active" ? "#888" : "#c0392b",
+                                        }}>
+                                            {activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "En el gym" : m.membershipStatus === "active" ? "Fuera" : "Inactivo"}
+                                        </span>
                                     </div>
-                                    <span style={{
-                                        ...s.badge,
-                                        background: m.membershipStatus === "active" ? "#F0F7F1" : "#FFF4F0",
-                                        color: m.membershipStatus === "active" ? "#3a7d44" : "#c0392b",
-                                    }}>
-                                        {m.membershipStatus === "active" ? "Activo" : "Inactivo"}
-                                    </span>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -405,4 +454,5 @@ const s: Record<string, React.CSSProperties> = {
     badge: { fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap" },
     dot: { width: 6, height: 6, borderRadius: "50%", flexShrink: 0 },
     empty: { fontSize: 11, color: "#bbb", margin: 0 },
+    filterBtn: { fontSize: 10, padding: "3px 8px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 500, transition: "all .15s" },
 };

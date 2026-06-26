@@ -4,6 +4,7 @@ import { AttendanceStatus } from "./attendance.types";
 export interface IAttendance extends Document {
     memberId: Types.ObjectId;
     checkInAt: Date;
+    checkOutAt?: Date;
     status: AttendanceStatus;
 
     createdAt: Date;
@@ -21,6 +22,11 @@ const attendanceSchema = new Schema<IAttendance>(
         checkInAt: {
             type: Date,
             default: Date.now,
+        },
+
+        checkOutAt: {
+            type: Date,
+            default: null,
         },
 
         status: {

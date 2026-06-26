@@ -26,3 +26,8 @@ export const getAttendanceReport = async (dateFrom: string, dateTo: string) => {
     const response = await api.get(`/attendance/report?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`);
     return response.data;
 };
+
+export const getActiveAttendances = async () => {
+    const response = await api.get("/attendance/active");
+    return response.data;
+};

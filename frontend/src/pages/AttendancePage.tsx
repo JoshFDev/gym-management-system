@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from "chart.js";
-import { createAttendance, getAttendances, getAttendanceReport } from "../services/attendance.service";
+import { createAttendance, getAttendances, getAttendanceReport, getActiveAttendances } from "../services/attendance.service";
 import { getMembers } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
@@ -14,9 +14,8 @@ interface Attendance {
     id: string;
     member: { id: string; fullName: string; email?: string; phone?: string };
     checkInAt: string;
+    checkOutAt?: string;
     status: string;
-    createdAt: string;
-    updatedAt: string;
 }
 
 interface Member {
@@ -26,7 +25,19 @@ interface Member {
     membershipStatus: string;
 }
 
+interface ActiveMember {
+    id: string;
+    member: { id: string; fullName: string; email?: string; phone?: string };
+    checkInAt: string;
+}
+
 interface ToastMsg { id: number; text: string; type: "success" | "error" }
+
+const statusLabel: Record<string, string> = { checked_in: "Dentro", checked_out: "Completado" };
+const statusStyle: Record<string, React.CSSProperties> = {
+    checked_in: { background: "#F0F7F1", color: "#3a7d44" },
+    checked_out: { background: "#F0F0EE", color: "#888" },
+};
 
 const fmtDateTime = (d: string) =>
     new Date(d).toLocaleString("es-MX", {
@@ -34,11 +45,22 @@ const fmtDateTime = (d: string) =>
         hour: "2-digit", minute: "2-digit",
     });
 
+const fmtTime = (d: string) =>
+    new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+
 const initials = (name: string) =>
     name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
 const fmtDay = (d: string) =>
     new Date(d).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+
+const calcDuration = (a: string, b: string) => {
+    const diff = new Date(b).getTime() - new Date(a).getTime();
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+};
 
 function AttendanceDrawer({ open, members, submitting, memberId, onMemberChange, onSubmit, onClose }: {
     open: boolean; members: Member[]; submitting: boolean;
@@ -46,7 +68,6 @@ function AttendanceDrawer({ open, members, submitting, memberId, onMemberChange,
     onSubmit: (e: React.FormEvent) => void; onClose: () => void;
 }) {
     useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
-
     return (
         <>
             <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none" }} onClick={onClose} aria-hidden />
@@ -131,9 +152,7 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
             },
             options: {
                 responsive: true,
-                plugins: {
-                    tooltip: { enabled: true },
-                },
+                plugins: { tooltip: { enabled: true } },
                 scales: {
                     y: { beginAtZero: true, ticks: { stepSize: 1 } },
                     x: { grid: { display: false } },
@@ -170,30 +189,22 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
         const oc = offscreen.getContext("2d");
         if (!oc) return;
 
-        // Background
         oc.fillStyle = "#f5f5f4";
         oc.fillRect(0, 0, totalW, totalH);
-
-        // White card
         oc.fillStyle = "#fff";
-        const cardX = 0;
-        const cardY = 0;
-        const cardW = totalW;
-        const cardH = totalH;
         oc.beginPath();
-        oc.roundRect(cardX, cardY, cardW, cardH, 12);
+        oc.roundRect(0, 0, totalW, totalH, 12);
         oc.fill();
 
-        // Header
+        const periodLabel = period === "today" ? "Hoy" : period === "week" ? "Esta semana" : period === "month" ? "Este mes" : "Este año";
+
         oc.fillStyle = "#1a1a1a";
         oc.font = "bold 18px sans-serif";
         oc.textAlign = "left";
         oc.fillText("ZenithGym", pad, pad + 28);
-
         oc.font = "13px sans-serif";
         oc.fillStyle = "#888";
         oc.fillText(`Reporte de asistencia · ${periodLabel}`, pad, pad + 52);
-
         oc.font = "bold 28px sans-serif";
         oc.fillStyle = "#1a1a1a";
         oc.textAlign = "right";
@@ -201,8 +212,6 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
         oc.font = "11px sans-serif";
         oc.fillStyle = "#bbb";
         oc.fillText(`entrada${total !== 1 ? "s" : ""}`, totalW - pad, pad + 50);
-
-        // Divider line
         oc.strokeStyle = "#f0f0ee";
         oc.lineWidth = 1;
         oc.beginPath();
@@ -210,7 +219,6 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
         oc.lineTo(totalW - pad, pad + 68);
         oc.stroke();
 
-        // Draw chart onto offscreen
         oc.drawImage(orig, pad, pad + headerH, w, h);
 
         const link = document.createElement("a");
@@ -266,6 +274,7 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
 export default function AttendancePage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [members, setMembers] = useState<Member[]>([]);
+    const [activeMembers, setActiveMembers] = useState<ActiveMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [memberId, setMemberId] = useState("");
@@ -278,10 +287,6 @@ export default function AttendancePage() {
     const [filterSearch, setFilterSearch] = useState("");
     const [filterGender, setFilterGender] = useState("");
     const [filterDate, setFilterDate] = useState("");
-    const setSearch = (v: string) => { setFilterSearch(v); setPage(1); };
-    const setGender = (v: string) => { setFilterGender(v); setPage(1); };
-    const setDateFilter = (v: string) => { setFilterDate(v); setPage(1); };
-    const clearFilters = () => { setFilterSearch(""); setFilterGender(""); setFilterDate(""); setPage(1); };
     const [reportOpen, setReportOpen] = useState(false);
     const [reportLoading, setReportLoading] = useState(false);
     const [reportData, setReportData] = useState<number[]>([]);
@@ -293,7 +298,12 @@ export default function AttendancePage() {
     const cooldownRef = useRef(false);
     const scannerContainerId = "qr-scanner-container";
 
-    const activeMembers = members.filter((m) => m.membershipStatus === "active");
+    const setSearch = (v: string) => { setFilterSearch(v); setPage(1); };
+    const setGender = (v: string) => { setFilterGender(v); setPage(1); };
+    const setDateFilter = (v: string) => { setFilterDate(v); setPage(1); };
+    const clearFilters = () => { setFilterSearch(""); setFilterGender(""); setFilterDate(""); setPage(1); };
+
+    const activeMembersList = members.filter((m) => m.membershipStatus === "active");
 
     const addToast = useCallback((text: string, type: "success" | "error" = "success") => {
         const id = Date.now();
@@ -331,20 +341,29 @@ export default function AttendancePage() {
         setTotalPages(res.totalPages ?? 1);
     }, [buildFilters]);
 
-    useSocketRefresh(["attendance_created"], () => loadAttendances(page));
+    const loadActiveMembers = useCallback(async () => {
+        try {
+            const res = await getActiveAttendances();
+            setActiveMembers(res.data ?? []);
+        } catch { /* ignore */ }
+    }, []);
+
+    useSocketRefresh(["attendance_created"], () => { loadAttendances(page); loadActiveMembers(); });
 
     useEffect(() => {
         const init = async () => {
             try {
                 const f = buildFilters();
-                const [attRes, membersRes] = await Promise.all([
+                const [attRes, membersRes, activeRes] = await Promise.all([
                     getAttendances(page, limit, f),
                     getMembers(),
+                    getActiveAttendances(),
                 ]);
                 setAttendances(attRes.data ?? []);
                 setTotal(attRes.total ?? 0);
                 setTotalPages(attRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
+                setActiveMembers(activeRes.data ?? []);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -381,11 +400,15 @@ export default function AttendancePage() {
                         cooldownRef.current = true;
                         setTimeout(() => { cooldownRef.current = false; }, 5000);
                         try {
-                            await createAttendance(member.id);
-                            addToast(`Entrada registrada: ${member.firstName} ${member.lastName}`);
+                            const res = await createAttendance(member.id);
+                            const isCheckOut = res.action === "check_out";
+                            addToast(isCheckOut
+                                ? `Salida registrada: ${member.firstName} ${member.lastName}`
+                                : `Entrada registrada: ${member.firstName} ${member.lastName}`);
                             loadAttendances(page);
+                            loadActiveMembers();
                         } catch {
-                            addToast("Error al registrar entrada", "error");
+                            addToast("Error al registrar", "error");
                         }
                     },
                     () => { }
@@ -398,32 +421,26 @@ export default function AttendancePage() {
             }
         })();
         return () => { cancelled = true; scanner.stop().catch(() => {}); };
-    }, [scanning, members, addToast, loadAttendances, page]);
+    }, [scanning, members, addToast, loadAttendances, page, loadActiveMembers]);
 
-    const clearForm = () => {
-        setMemberId(""); setDrawerOpen(false);
-    };
+    const clearForm = () => { setMemberId(""); setDrawerOpen(false); };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!memberId) return;
         setSubmitting(true);
         try {
-            await createAttendance(memberId);
-            addToast("Entrada registrada");
+            const res = await createAttendance(memberId);
+            addToast(res.action === "check_out" ? "Salida registrada" : "Entrada registrada");
             clearForm();
             loadAttendances(page);
+            loadActiveMembers();
         } catch {
-            addToast("Error al registrar entrada", "error");
+            addToast("Error al registrar", "error");
         } finally {
             setSubmitting(false);
         }
     };
-
-    const today = new Date().toDateString();
-    const todayCount = attendances.filter(
-        (a) => new Date(a.checkInAt).toDateString() === today
-    ).length;
 
     const openReport = async (period: string) => {
         setReportPeriod(period);
@@ -434,13 +451,11 @@ export default function AttendancePage() {
         let from: Date, to: Date;
         if (period === "today") {
             from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            to = new Date(from);
-            to.setDate(to.getDate() + 1);
+            to = new Date(from); to.setDate(to.getDate() + 1);
         } else if (period === "week") {
             const day = now.getDay();
             from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day === 0 ? 6 : day - 1));
-            to = new Date(from);
-            to.setDate(to.getDate() + 7);
+            to = new Date(from); to.setDate(to.getDate() + 7);
         } else if (period === "month") {
             from = new Date(now.getFullYear(), now.getMonth(), 1);
             to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -462,26 +477,11 @@ export default function AttendancePage() {
 
     return (
         <div style={s.page}>
-            <AttendanceDrawer
-                open={drawerOpen}
-                members={members}
-                submitting={submitting}
-                memberId={memberId}
-                onMemberChange={setMemberId}
-                onSubmit={handleSubmit}
-                onClose={clearForm}
-            />
+            <AttendanceDrawer open={drawerOpen} members={members} submitting={submitting}
+                memberId={memberId} onMemberChange={setMemberId} onSubmit={handleSubmit} onClose={clearForm} />
 
-            <ReportModal
-                open={reportOpen}
-                loading={reportLoading}
-                data={reportData}
-                labels={reportLabels}
-                period={reportPeriod}
-                total={reportTotal}
-                onPeriod={openReport}
-                onClose={() => setReportOpen(false)}
-            />
+            <ReportModal open={reportOpen} loading={reportLoading} data={reportData} labels={reportLabels}
+                period={reportPeriod} total={reportTotal} onPeriod={openReport} onClose={() => setReportOpen(false)} />
 
             <div style={s.toastStack}>
                 {toasts.map((t) => (
@@ -493,28 +493,25 @@ export default function AttendancePage() {
                 ))}
             </div>
 
-            <PageHeader
-                title="Asistencia"
-                action={
-                    <div style={{ display: "flex", gap: 8 }}>
-                        <GymButton icon="ti-report-chart" onClick={() => { setReportPeriod(""); setReportData([]); setReportLabels([]); setReportTotal(0); setReportOpen(true); }}>
-                            Reporte
-                        </GymButton>
-                        <GymButton icon="ti-qrcode" onClick={() => { setDrawerOpen(false); setScanning((p) => !p); }}>
-                            {scanning ? "Detener escáner" : "Escanear QR"}
-                        </GymButton>
-                        <GymButton icon="ti-login" onClick={() => { setScanning(false); setDrawerOpen(true); }}>
-                            Registrar entrada
-                        </GymButton>
-                    </div>
-                }
-            />
+            <PageHeader title="Asistencia" action={
+                <div style={{ display: "flex", gap: 8 }}>
+                    <GymButton icon="ti-report-chart" onClick={() => { setReportPeriod(""); setReportData([]); setReportLabels([]); setReportTotal(0); setReportOpen(true); }}>Reporte</GymButton>
+                    <GymButton icon="ti-qrcode" onClick={() => { setDrawerOpen(false); setScanning((p) => !p); }}>{scanning ? "Detener escáner" : "Escanear QR"}</GymButton>
+                    <GymButton icon="ti-login" onClick={() => { setScanning(false); setDrawerOpen(true); }}>Registrar</GymButton>
+                </div>
+            } />
 
             <div style={s.content}>
+                {/* Summary cards */}
                 <div style={s.summaryCard}>
                     <div style={s.summaryItem}>
+                        <p style={s.summaryLabel}>En el gym ahora</p>
+                        <p style={{ ...s.summaryValue, color: activeMembers.length > 0 ? "#3a7d44" : "#bbb" }}>{activeMembers.length}</p>
+                    </div>
+                    <div style={s.summaryDivider} />
+                    <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Entradas hoy</p>
-                        <p style={s.summaryValue}>{todayCount}</p>
+                        <p style={s.summaryValue}>{attendances.length}</p>
                     </div>
                     <div style={s.summaryDivider} />
                     <div style={s.summaryItem}>
@@ -524,25 +521,45 @@ export default function AttendancePage() {
                     <div style={s.summaryDivider} />
                     <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Miembros activos</p>
-                        <p style={s.summaryValue}>{activeMembers.length}</p>
+                        <p style={s.summaryValue}>{activeMembersList.length}</p>
                     </div>
                 </div>
+
+                {/* Active members panel */}
+                {activeMembers.length > 0 && (
+                    <div style={s.activeCard}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span style={s.liveDot} />
+                            <span style={s.activeTitle}>En el gimnasio ahora</span>
+                            <span style={s.activeBadge}>{activeMembers.length}</span>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {activeMembers.map((a) => (
+                                <div key={a.id} style={s.activeChip}>
+                                    {a.member.fullName}
+                                    <span style={{ fontSize: 10, color: "#888", marginLeft: 4 }}>
+                                        ({fmtTime(a.checkInAt)})
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {scanning && (
                     <div style={s.card}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                             <div>
                                 <p style={s.formTitle}>Escanear QR</p>
-                                <p style={s.formDesc}>Apunta al código QR del miembro para registrar su entrada.</p>
+                                <p style={s.formDesc}>Escanea el QR del miembro. Si ya tiene entrada activa, se registrará la salida.</p>
                             </div>
-                            <button style={s.btnIcon} onClick={() => setScanning(false)}>
-                                <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
-                            </button>
+                            <button style={s.btnIcon} onClick={() => setScanning(false)}><i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden /></button>
                         </div>
                         <div id={scannerContainerId} style={s.scannerContainer} />
                     </div>
                 )}
 
+                {/* Filters */}
                 <div style={s.toolbar}>
                     <div style={s.searchWrap}>
                         <i className="ti ti-search" style={s.searchIcon} aria-hidden />
@@ -569,6 +586,7 @@ export default function AttendancePage() {
                     )}
                 </div>
 
+                {/* Attendance table */}
                 {loading ? (
                     <p style={s.empty}>Cargando asistencias…</p>
                 ) : attendances.length === 0 ? (
@@ -579,9 +597,10 @@ export default function AttendancePage() {
                             <thead>
                                 <tr style={s.thead}>
                                     <th style={s.th}>Miembro</th>
-                                    <th style={s.th}>Correo</th>
-                                    <th style={s.th}>Teléfono</th>
                                     <th style={s.th}>Entrada</th>
+                                    <th style={s.th}>Salida</th>
+                                    <th style={s.th}>Duración</th>
+                                    <th style={s.th}>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -593,9 +612,16 @@ export default function AttendancePage() {
                                                 <span style={{ fontWeight: 500 }}>{a.member.fullName}</span>
                                             </div>
                                         </td>
-                                        <td style={{ ...s.td, ...s.muted }}>{a.member.email ?? "—"}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>{a.member.phone ?? "—"}</td>
                                         <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(a.checkInAt)}</td>
+                                        <td style={{ ...s.td, ...s.muted }}>{a.checkOutAt ? fmtDateTime(a.checkOutAt) : "—"}</td>
+                                        <td style={{ ...s.td, ...s.muted }}>
+                                            {a.checkOutAt ? calcDuration(a.checkInAt, a.checkOutAt) : <span style={{ color: "#3a7d44", fontSize: 11 }}>En curso</span>}
+                                        </td>
+                                        <td style={s.td}>
+                                            <span style={{ ...s.badge, ...(statusStyle[a.status] ?? { background: "#F0F0EE", color: "#888" }) }}>
+                                                {statusLabel[a.status] ?? a.status}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -662,4 +688,9 @@ const s: Record<string, React.CSSProperties> = {
     searchIcon:     { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
     searchInput:    { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 12, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
     clearBtn:       { position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 2, display: "flex", alignItems: "center" },
+    activeCard:     { background: "#F0F7F1", border: "1px solid #d1e7d3", borderRadius: 8, padding: "12px 16px" },
+    liveDot:        { width: 8, height: 8, borderRadius: "50%", background: "#3a7d44", display: "inline-block", animation: "pulse 1.5s ease infinite" },
+    activeTitle:    { fontSize: 12, fontWeight: 600, color: "#1a1a1a" },
+    activeBadge:    { fontSize: 10, fontWeight: 600, color: "#3a7d44", background: "#d1e7d3", borderRadius: 10, padding: "1px 7px" },
+    activeChip:     { background: "#fff", border: "1px solid #d1e7d3", borderRadius: 16, padding: "4px 12px", fontSize: 12, color: "#1a1a1a", display: "inline-flex", alignItems: "center" },
 };
