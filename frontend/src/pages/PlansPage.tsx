@@ -5,6 +5,7 @@ import GymButton from "../components/GymButton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import ConfirmModal from "../components/ConfirmModal";
 
 interface Plan {
@@ -126,6 +127,7 @@ export default function PlansPage() {
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search);
     const { addToast } = useToast();
+    useUnsavedChanges(drawerOpen);
 
     const loadPlans = useCallback(async () => {
         try {

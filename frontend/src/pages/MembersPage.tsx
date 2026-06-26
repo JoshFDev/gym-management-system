@@ -11,6 +11,7 @@ import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import ConfirmModal from "../components/ConfirmModal";
 
 interface Member {
@@ -309,6 +310,7 @@ export default function MembersPage() {
     const [total, setTotal] = useState(0);
     const limit = 20;
     const { addToast } = useToast();
+    useUnsavedChanges(drawerOpen);
 
     const loadMembers = useCallback(async (targetPage: number) => {
         const res = await getMembers(targetPage, limit, { search: debouncedSearch, status: filterStatus, gender: filterGender });

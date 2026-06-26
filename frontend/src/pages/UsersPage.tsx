@@ -17,6 +17,7 @@ import GymButton from "../components/GymButton";
 import type { UserRole } from "../hooks/useAuth";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import ConfirmModal from "../components/ConfirmModal";
 
 // ─────────────────────────────────────────────
@@ -368,6 +369,7 @@ export default function UsersPage() {
     const [filterRole, setFilterRole] = useState("");
 
     const { addToast } = useToast();
+    useUnsavedChanges(formOpen);
 
     const loadUsers = async () => {
         try {
