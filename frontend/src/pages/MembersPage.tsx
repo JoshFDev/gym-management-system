@@ -30,7 +30,7 @@ interface Member {
     updatedAt: string;
 }
 
-interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string }
+interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string; password?: string }
 
 const statusStyle = (status: string): React.CSSProperties =>
     status === "active"

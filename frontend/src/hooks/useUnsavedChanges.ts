@@ -1,7 +1,9 @@
-import { useEffect } from "react";
-import { useBlocker } from "react-router-dom";
+import { useEffect, useRef } from "react";
 
 export function useUnsavedChanges(hasChanges: boolean) {
+    const hasChangesRef = useRef(hasChanges);
+    hasChangesRef.current = hasChanges;
+
     useEffect(() => {
         if (!hasChanges) return;
         const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -9,13 +11,15 @@ export function useUnsavedChanges(hasChanges: boolean) {
         return () => window.removeEventListener("beforeunload", handler);
     }, [hasChanges]);
 
-    const blocker = useBlocker(hasChanges);
-
     useEffect(() => {
-        if (blocker.state === "blocked") {
-            const proceed = window.confirm("Tienes cambios sin guardar. ¿Salir de todas formas?");
-            if (proceed) blocker.proceed();
-            else blocker.reset();
-        }
-    }, [blocker]);
+        if (!hasChanges) return;
+        const handler = () => {
+            if (!window.confirm("Tienes cambios sin guardar. ¿Salir de todas formas?")) {
+                history.pushState(null, "", location.href);
+            }
+        };
+        history.pushState(null, "", location.href);
+        window.addEventListener("popstate", handler);
+        return () => window.removeEventListener("popstate", handler);
+    }, [hasChanges]);
 }

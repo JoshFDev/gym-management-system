@@ -9,7 +9,7 @@ interface AuditLog {
     entityId: string;
     user: { id: string; name: string; email: string } | null;
     userRole: string;
-    changes?: Record<string, any>;
+    changes?: Record<string, string | null | undefined>;
     createdAt: string;
 }
 
@@ -38,19 +38,18 @@ export default function AuditLogPage() {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const loadLogs = async () => {
-        try {
-            const res = await getAuditLogs();
-            setLogs(res.data ?? []);
-        } catch {
-            setLogs([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        loadLogs();
+        const load = async () => {
+            try {
+                const res = await getAuditLogs();
+                setLogs(res.data ?? []);
+            } catch {
+                setLogs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
     }, []);
 
     return (
