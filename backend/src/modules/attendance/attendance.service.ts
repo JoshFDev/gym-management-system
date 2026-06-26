@@ -45,6 +45,7 @@ interface AttendanceFilters {
     dateFrom?: string;
     dateTo?: string;
     search?: string;
+    memberId?: string;
 }
 
 const buildMemberQuery = async (filters?: AttendanceFilters): Promise<Record<string, unknown>> => {
@@ -64,7 +65,9 @@ const buildMemberQuery = async (filters?: AttendanceFilters): Promise<Record<str
         });
     }
 
-    if (memberConditions.length > 0) {
+    if (filters?.memberId) {
+        query.memberId = filters.memberId;
+    } else if (memberConditions.length > 0) {
         const members = await Member.find({ $and: memberConditions }).select("_id");
         query.memberId = { $in: members.map((m) => m._id) };
     }

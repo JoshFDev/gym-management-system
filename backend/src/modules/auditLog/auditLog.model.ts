@@ -7,6 +7,8 @@ export interface IAuditLog extends Document {
   userId: mongoose.Types.ObjectId;
   userRole: string;
   changes?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const auditLogSchema = new Schema<IAuditLog>(

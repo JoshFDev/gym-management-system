@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -323,9 +323,12 @@ export default function MembersPage() {
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [viewMember, setViewMember] = useState<Member | null>(null);
-    const [search, setSearch] = useState("");
-    const [filterStatus, setFilterStatus] = useState("");
-    const [filterGender, setFilterGender] = useState("");
+    const [search, setSearchState] = useState("");
+    const [filterStatus, setFilterStatusState] = useState("");
+    const [filterGender, setFilterGenderState] = useState("");
+    const setSearch = (v: string) => { setSearchState(v); setPage(1); };
+    const setFilterStatus = (v: string) => { setFilterStatusState(v); setPage(1); };
+    const setFilterGender = (v: string) => { setFilterGenderState(v); setPage(1); };
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState<Member | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
@@ -343,27 +346,15 @@ export default function MembersPage() {
     }, []);
 
     const loadMembers = useCallback(async (targetPage: number) => {
-        const res = await getMembers(targetPage, limit);
+        const res = await getMembers(targetPage, limit, { search, status: filterStatus, gender: filterGender });
         setMembers(res.data ?? []);
         setTotal(res.total ?? 0);
         setTotalPages(res.totalPages ?? 1);
-    }, []);
+    }, [search, filterStatus, filterGender]);
 
     useSocketRefresh(["member_created", "member_updated", "member_deactivated"], () => loadMembers(page));
 
     useEffect(() => { (async () => { try { await loadMembers(page); } finally { setLoading(false); } })(); }, [loadMembers, page]);
-
-    const filtered = useMemo(() => {
-        const q = search.toLowerCase().trim();
-        return members.filter((m) => {
-            const nameMatch = !q || `${m.firstName} ${m.lastName} ${m.email ?? ""} ${m.phone}`.toLowerCase().includes(q);
-            const statusMatch = !filterStatus || m.membershipStatus === filterStatus;
-            const genderMatch = !filterGender || m.gender === filterGender;
-            return nameMatch && statusMatch && genderMatch;
-        });
-    }, [members, search, filterStatus, filterGender]);
-
-
 
     const hasFilters = search || filterStatus || filterGender;
     const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterGender(""); };
@@ -438,12 +429,12 @@ export default function MembersPage() {
                     </select>
                     {hasFilters && <button style={s.btnClear} onClick={clearFilters}><i className="ti ti-filter-off" style={{ fontSize: 12 }} aria-hidden /> Limpiar</button>}
                     <div style={{ flex: 1 }} />
-                    <button style={s.btnExport} onClick={() => exportExcel(filtered)}><i className="ti ti-table-export" style={{ fontSize: 14 }} aria-hidden />Excel</button>
-                    <button style={s.btnExport} onClick={() => exportPDF(filtered)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
+                    <button style={s.btnExport} onClick={() => exportExcel(members)}><i className="ti ti-table-export" style={{ fontSize: 14 }} aria-hidden />Excel</button>
+                    <button style={s.btnExport} onClick={() => exportPDF(members)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
                 </div>
-                {!loading && <p style={s.resultCount}>{hasFilters ? `${filtered.length} de ${total}` : `${total} miembro${total !== 1 ? "s" : ""}`}</p>}
+                {!loading && <p style={s.resultCount}>{hasFilters ? `${members.length} de ${total}` : `${total} miembro${total !== 1 ? "s" : ""}`}</p>}
                 {loading ? <p style={s.empty}>Cargando miembros…</p>
-                : filtered.length === 0 ? (
+                : members.length === 0 ? (
                     <div style={s.emptyState}>
                         <i className="ti ti-users-group" style={{ fontSize: 32, color: "#D0D0CE", marginBottom: 10 }} aria-hidden />
                         <p style={{ margin: 0, fontSize: 13, color: "#bbb", fontWeight: 500 }}>{hasFilters ? "Sin resultados" : "No hay miembros registrados"}</p>
@@ -456,7 +447,7 @@ export default function MembersPage() {
                             <thead><tr style={s.thead}>
                                 <th style={s.th}>Miembro</th><th style={s.th}>Correo</th><th style={s.th}>Teléfono</th><th style={s.th}>Género</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
                             </tr></thead>
-                            <tbody>{filtered.map((m) => (
+                            <tbody>{members.map((m) => (
                                 <tr key={m.id} style={s.row} className="member-row">
                                     <td style={s.td}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

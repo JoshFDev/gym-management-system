@@ -6,13 +6,13 @@ import { profile } from "./auth.controller";
 import { authenticate } from "../../shared/middlewares/authenticate";
 import { authorize } from "../../shared/middlewares/authorize";
 import { adminOnly } from "./auth.controller";
-import { forgotPasswordSchema } from "./auth.validation";
-import { resetPasswordSchema } from "./auth.validation";
+import { forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } from "./auth.validation";
 import {
     login,
     register,
     forgotPasswordHandler,
     resetPasswordHandler,
+    changePasswordHandler,
 } from "./auth.controller";
 
 import { authLimiter, signupLimiter } from "../../shared/middlewares/rateLimiters";
@@ -26,4 +26,5 @@ router.get("/profile",   authenticate, profile);
 router.get("/admin",     authenticate, authorize("admin"), adminOnly);
 router.post("/forgot-password", validate(forgotPasswordSchema), forgotPasswordHandler);
 router.post("/reset-password/:token", validate(resetPasswordSchema), resetPasswordHandler);
+router.put("/change-password", authenticate, validate(changePasswordSchema), changePasswordHandler);
 export default router;

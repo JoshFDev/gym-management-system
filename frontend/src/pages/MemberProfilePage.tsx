@@ -55,6 +55,8 @@ export default function MemberProfilePage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
+    const [attPage, setAttPage] = useState(1);
+    const attLimit = 10;
 
     useEffect(() => {
         if (!id) return;
@@ -62,12 +64,12 @@ export default function MemberProfilePage() {
             try {
                 const [memberRes, attRes, payRes] = await Promise.all([
                     getMemberById(id),
-                    getAttendances(),
-                    getPayments(),
+                    getAttendances(1, 100, { memberId: id }),
+                    getPayments(1, 100, id),
                 ]);
                 setMember(memberRes.data);
-                setAttendances((attRes.data ?? []).filter((a: Attendance) => a.member.id === id));
-                setPayments((payRes.data ?? []).filter((p: Payment) => p.member.fullName === `${memberRes.data.firstName} ${memberRes.data.lastName}`));
+                setAttendances(attRes.data ?? []);
+                setPayments(payRes.data ?? []);
             } catch {
                 navigate("/members");
             } finally {
@@ -156,28 +158,57 @@ export default function MemberProfilePage() {
                     {attendances.length === 0 ? (
                         <p style={s.empty}>Sin asistencias registradas.</p>
                     ) : (
-                        <div style={{ overflowX: "auto" }}>
-                            <table style={s.table}>
-                                <thead><tr style={s.thead}>
-                                    <th style={s.th}>Fecha</th><th style={s.th}>Hora</th><th style={s.th}>Estado</th>
-                                </tr></thead>
-                                <tbody>
-                                    {attendances.slice(0, 50).map((a) => {
-                                        const d = new Date(a.checkInAt);
-                                        return (
-                                            <tr key={a.id} style={s.row}>
-                                                <td style={s.td}>{d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                                                <td style={{ ...s.td, ...s.muted }}>{d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</td>
-                                                <td style={s.td}>
-                                                    <span style={{ ...s.badgeSm, ...(a.status === "present" ? { background: "#F0F7F1", color: "#3a7d44" } : { background: "#FFF4F0", color: "#c0392b" }) }}>
-                                                        {a.status === "present" ? "Presente" : a.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <div>
+                            <div style={{ overflowX: "auto" }}>
+                                <table style={s.table}>
+                                    <thead><tr style={s.thead}>
+                                        <th style={s.th}>Fecha</th><th style={s.th}>Hora</th><th style={s.th}>Estado</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        {attendances.slice((attPage - 1) * attLimit, attPage * attLimit).map((a) => {
+                                            const d = new Date(a.checkInAt);
+                                            return (
+                                                <tr key={a.id} style={s.row}>
+                                                    <td style={s.td}>{d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                                                    <td style={{ ...s.td, ...s.muted }}>{d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</td>
+                                                    <td style={s.td}>
+                                                        <span style={{ ...s.badgeSm, ...(a.status === "present" ? { background: "#F0F7F1", color: "#3a7d44" } : { background: "#FFF4F0", color: "#c0392b" }) }}>
+                                                            {a.status === "present" ? "Presente" : a.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {attendances.length > attLimit && (
+                                <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
+                                    <button
+                                        disabled={attPage <= 1}
+                                        onClick={() => setAttPage((p) => p - 1)}
+                                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "none", background: "#F7F7F6", color: "#666", cursor: attPage <= 1 ? "default" : "pointer", opacity: attPage <= 1 ? 0.3 : 1 }}
+                                    >
+                                        Anterior
+                                    </button>
+                                    {Array.from({ length: Math.ceil(attendances.length / attLimit) }, (_, i) => i + 1).map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setAttPage(p)}
+                                            style={{ fontSize: 11, padding: "4px 8px", borderRadius: 4, border: "none", background: p === attPage ? "#1a1a1a" : "#F7F7F6", color: p === attPage ? "#fff" : "#666", cursor: "pointer" }}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                    <button
+                                        disabled={attPage >= Math.ceil(attendances.length / attLimit)}
+                                        onClick={() => setAttPage((p) => p + 1)}
+                                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "none", background: "#F7F7F6", color: "#666", cursor: attPage >= Math.ceil(attendances.length / attLimit) ? "default" : "pointer", opacity: attPage >= Math.ceil(attendances.length / attLimit) ? 0.3 : 1 }}
+                                    >
+                                        Siguiente
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

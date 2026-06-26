@@ -5,6 +5,7 @@ interface AttendanceFilters {
     dateFrom?: string;
     dateTo?: string;
     search?: string;
+    memberId?: string;
 }
 
 export const getAttendances = async (page: number = 1, limit: number = 20, filters?: AttendanceFilters) => {
@@ -13,6 +14,7 @@ export const getAttendances = async (page: number = 1, limit: number = 20, filte
     if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
     if (filters?.dateTo) params.set("dateTo", filters.dateTo);
     if (filters?.search) params.set("search", filters.search);
+    if (filters?.memberId) params.set("memberId", filters.memberId);
     const response = await api.get(`/attendance?${params.toString()}`);
     return response.data;
 };

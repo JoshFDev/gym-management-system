@@ -42,6 +42,7 @@ export const getDashboardStats = async () => {
         yesterdayAttendances,
         paymentsThisMonth,
         paymentsPrevMonth,
+        pendingPayments,
     ] = await Promise.all([
 
         Member.countDocuments({ membershipStatus: MembershipStatus.ACTIVE }),
@@ -74,6 +75,8 @@ export const getDashboardStats = async () => {
             status: PaymentStatus.PAID,
             paidAt: { $gte: prevMonthStart, $lte: prevMonthEnd },
         }),
+
+        Payment.countDocuments({ status: PaymentStatus.PENDING }),
     ]);
 
     const totalRevenue = paymentsThisMonth.reduce(
@@ -99,7 +102,7 @@ export const getDashboardStats = async () => {
         revenueGrowth,
         attendanceDelta,
         expiringThisMonth: expiringSubscriptions,
-        pendingPayments:   0,   // PaymentStatus no tiene PENDING — siempre 0 por ahora
+        pendingPayments,
         revenueGoal:       REVENUE_GOAL,
     };
 };

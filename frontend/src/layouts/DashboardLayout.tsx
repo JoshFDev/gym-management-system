@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { clearAuth, getStoredToken, useAuth } from "../hooks/useAuth";
 import type { UserRole } from "../hooks/useAuth";
 import {
@@ -38,6 +38,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
 export default function DashboardLayout() {
     const navigate = useNavigate();
     const { user, role } = useAuth();
+    const [logoutConfirm, setLogoutConfirm] = useState(false);
 
     useEffect(() => {
         const token = getStoredToken();
@@ -114,7 +115,7 @@ export default function DashboardLayout() {
                             </div>
                         </div>
                     )}
-                    <button style={s.logoutBtn} onClick={handleLogout}>
+                    <button style={s.logoutBtn} onClick={() => setLogoutConfirm(true)}>
                         <i className="ti ti-logout" style={{ fontSize: 15 }} aria-hidden />
                         Cerrar sesión
                     </button>
@@ -125,13 +126,26 @@ export default function DashboardLayout() {
                 <Outlet />
                 {role && (role === "admin" || role === "receptionist") && <FloatingQrScanner />}
             </main>
+
+            {logoutConfirm && (
+                <div style={s.overlay} onClick={() => setLogoutConfirm(false)}>
+                    <div style={s.confirmBox} onClick={(e) => e.stopPropagation()}>
+                        <p style={s.confirmTitle}>Cerrar sesión</p>
+                        <p style={s.confirmText}>¿Estás seguro de que deseas salir?</p>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                            <button style={s.cancelBtn} onClick={() => setLogoutConfirm(false)}>Cancelar</button>
+                            <button style={s.confirmBtn} onClick={handleLogout}>Salir</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 const s: Record<string, React.CSSProperties> = {
-    wrap:         { display: "flex", minHeight: "100svh", background: "#F7F7F6" },
-    sidebar:      { width: 210, minWidth: 210, background: "#fff", borderRight: "1px solid #E5E4E2", display: "flex", flexDirection: "column" },
+    wrap:         { display: "flex", height: "100svh", overflow: "hidden", background: "#F7F7F6" },
+    sidebar:      { width: 210, minWidth: 210, height: "100svh", background: "#fff", borderRight: "1px solid #E5E4E2", display: "flex", flexDirection: "column", flexShrink: 0 },
     logo:         { padding: "22px 20px 18px", borderBottom: "1px solid #E5E4E2" },
     logoName:     { fontSize: 15, fontWeight: 600, color: "#1a1a1a", letterSpacing: -0.3, margin: 0 },
     logoTag:      { fontSize: 11, color: "#bbb", marginTop: 3, margin: 0 },
@@ -146,4 +160,10 @@ const s: Record<string, React.CSSProperties> = {
     userRole:     { fontSize: 11, color: "#bbb", margin: 0 },
     logoutBtn:    { display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#bbb", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" },
     main:         { flex: 1, minWidth: 0, overflowY: "auto" },
+    overlay:      { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
+    confirmBox:   { background: "#fff", borderRadius: 10, padding: "22px 24px", minWidth: 280, boxShadow: "0 6px 24px rgba(0,0,0,0.12)" },
+    confirmTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
+    confirmText:  { fontSize: 13, color: "#555", margin: "8px 0 0" },
+    cancelBtn:    { padding: "7px 16px", borderRadius: 6, border: "1px solid #E5E4E2", background: "#fff", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" },
+    confirmBtn:   { padding: "7px 16px", borderRadius: 6, border: "none", background: "#c0392b", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 },
 };

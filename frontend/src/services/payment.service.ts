@@ -1,7 +1,9 @@
 import api from "../api/axios";
 
-export const getPayments = async (page: number = 1, limit: number = 20) => {
-    const response = await api.get(`/payments?page=${page}&limit=${limit}`);
+export const getPayments = async (page: number = 1, limit: number = 20, memberId?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (memberId) params.set("memberId", memberId);
+    const response = await api.get(`/payments?${params.toString()}`);
     return response.data;
 };
 

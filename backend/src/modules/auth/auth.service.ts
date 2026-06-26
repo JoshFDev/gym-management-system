@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import User from "./auth.model";
-import { RegisterInput, LoginInput } from "./auth.validation";
+import { RegisterInput, LoginInput, ChangePasswordInput } from "./auth.validation";
 import { ConflictError } from "../../shared/errors/ConflictError";
 import { UnauthorizedError } from "../../shared/errors/UnauthorizedError";
 import { generateToken } from "../../utils/jwt";
@@ -147,6 +147,25 @@ export const resetPassword = async (
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
 
+    await user.save();
+};
+
+export const changePassword = async (
+    userId: string,
+    data: ChangePasswordInput
+) => {
+    const user = await User.findById(userId).select("+password");
+
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    const isMatch = await bcrypt.compare(data.currentPassword, user.password);
+    if (!isMatch) {
+        throw new UnauthorizedError("Current password is incorrect.");
+    }
+
+    user.password = await bcrypt.hash(data.newPassword, 12);
     await user.save();
 };
 

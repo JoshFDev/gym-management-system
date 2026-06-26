@@ -204,7 +204,7 @@ export default function DashboardPage() {
                     getActiveAttendances(),
                 ]);
                 setStats(statsRes.data);
-                setMembers((membersRes.data ?? []).slice(0, 4));
+                setMembers(membersRes.data ?? []);
                 setPayments((paymentsRes.data ?? []).slice(0, 3));
                 setWeekData(buildWeekData(attendanceRes.data ?? [], paymentsRes.data ?? []));
                 setActiveMembers(activeRes.data ?? []);
@@ -360,45 +360,49 @@ export default function DashboardPage() {
                             {statusFilter === "gym" ? (
                                 activeMembers.length === 0 ? (
                                     <p style={s.empty}>Nadie en el gimnasio ahora.</p>
-                                ) : activeMembers.map((a: ActiveMember) => (
-                                    <div key={a.id} style={s.listRow}>
-                                        <div style={{ ...s.avatar, background: "#F0F7F1", color: "#3a7d44" }}>
-                                            {initials(a.member.fullName.split(" ")[0], a.member.fullName.split(" ")[1] ?? "")}
+                                ) : (
+                                    activeMembers.slice(0, 5).map((a: ActiveMember) => (
+                                        <div key={a.id} style={s.listRow}>
+                                            <div style={{ ...s.avatar, background: "#F0F7F1", color: "#3a7d44" }}>
+                                                {initials(a.member.fullName.split(" ")[0], a.member.fullName.split(" ")[1] ?? "")}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <p style={s.listName}>{a.member.fullName}</p>
+                                                <p style={s.listSub}>Desde {new Date(a.checkInAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</p>
+                                            </div>
+                                            <span style={{ ...s.badge, background: "#F0F7F1", color: "#3a7d44" }}>
+                                                En el gym
+                                            </span>
                                         </div>
-                                        <div style={{ flex: 1 }}>
-                                            <p style={s.listName}>{a.member.fullName}</p>
-                                            <p style={s.listSub}>Desde {new Date(a.checkInAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</p>
-                                        </div>
-                                        <span style={{ ...s.badge, background: "#F0F7F1", color: "#3a7d44" }}>
-                                            En el gym
-                                        </span>
-                                    </div>
-                                ))
+                                    ))
+                                )
                             ) : (
                                 members.length === 0 ? (
                                     <p style={s.empty}>Sin miembros.</p>
-                                ) : members.map((m) => (
-                                    <div key={m.id} style={s.listRow}>
-                                        <div style={{
-                                            ...s.avatar,
-                                            background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE",
-                                            color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "inactive" ? "#c0392b" : "#666",
-                                        }}>
-                                            {initials(m.firstName, m.lastName)}
+                                ) : (
+                                    members.slice(0, 4).map((m) => (
+                                        <div key={m.id} style={s.listRow}>
+                                            <div style={{
+                                                ...s.avatar,
+                                                background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE",
+                                                color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "inactive" ? "#c0392b" : "#666",
+                                            }}>
+                                                {initials(m.firstName, m.lastName)}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <p style={s.listName}>{m.firstName} {m.lastName}</p>
+                                                {m.planName && <p style={s.listSub}>{m.planName}</p>}
+                                            </div>
+                                            <span style={{
+                                                ...s.badge,
+                                                background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "active" ? "#E5E4E2" : "#FFF4F0",
+                                                color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "active" ? "#888" : "#c0392b",
+                                            }}>
+                                                {activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "En el gym" : m.membershipStatus === "active" ? "Fuera" : "Inactivo"}
+                                            </span>
                                         </div>
-                                        <div style={{ flex: 1 }}>
-                                            <p style={s.listName}>{m.firstName} {m.lastName}</p>
-                                            {m.planName && <p style={s.listSub}>{m.planName}</p>}
-                                        </div>
-                                        <span style={{
-                                            ...s.badge,
-                                            background: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#F0F7F1" : m.membershipStatus === "active" ? "#E5E4E2" : "#FFF4F0",
-                                            color: activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "#3a7d44" : m.membershipStatus === "active" ? "#888" : "#c0392b",
-                                        }}>
-                                            {activeMembers.some((a: ActiveMember) => a.member.id === m.id) ? "En el gym" : m.membershipStatus === "active" ? "Fuera" : "Inactivo"}
-                                        </span>
-                                    </div>
-                                ))
+                                    ))
+                                )
                             )}
                         </div>
                     </div>

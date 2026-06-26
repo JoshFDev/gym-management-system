@@ -37,7 +37,12 @@ export const getAll = asyncHandler(
     async (req: Request, res: Response) => {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-        const result = await getMembers(page, limit);
+        const filters = {
+            search: req.query.search as string | undefined,
+            status: req.query.status as string | undefined,
+            gender: req.query.gender as string | undefined,
+        };
+        const result = await getMembers(page, limit, filters);
         res.status(200).json({
             success: true,
             data: result.items.map(toMemberResponse),

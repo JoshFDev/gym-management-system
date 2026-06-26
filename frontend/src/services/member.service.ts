@@ -1,7 +1,11 @@
 import api from "../api/axios";
 
-export const getMembers = async (page: number = 1, limit: number = 20) => {
-    const response = await api.get(`/members?page=${page}&limit=${limit}`);
+export const getMembers = async (page: number = 1, limit: number = 20, filters?: { search?: string; status?: string; gender?: string }) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (filters?.search) params.set("search", filters.search);
+    if (filters?.status) params.set("status", filters.status);
+    if (filters?.gender) params.set("gender", filters.gender);
+    const response = await api.get(`/members?${params.toString()}`);
 
     return response.data;
 };

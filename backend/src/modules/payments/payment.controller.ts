@@ -48,7 +48,8 @@ export const getAll = asyncHandler(
     async (req: Request, res: Response) => {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-        const result = await getPayments(page, limit);
+        const memberId = req.query.memberId as string | undefined;
+        const result = await getPayments(page, limit, memberId);
         res.status(200).json({
             success: true,
             data: result.items.map(toPaymentResponse),

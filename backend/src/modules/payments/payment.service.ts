@@ -46,11 +46,14 @@ export const createPayment = async (
     return payment;
 };
 
-export const getPayments = async (page: number = 1, limit: number = 20) => {
+export const getPayments = async (page: number = 1, limit: number = 20, memberId?: string) => {
+
+    const filter: Record<string, unknown> = {};
+    if (memberId) filter.memberId = memberId;
 
     const result = await paginate(
         Payment,
-        {},
+        filter,
         page,
         limit,
         { paidAt: -1 },

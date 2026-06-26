@@ -16,10 +16,25 @@ export const createMember = async (
     return member;
 };
 
-export const getMembers = async (page: number = 1, limit: number = 20) => {
+export const getMembers = async (
+    page: number = 1,
+    limit: number = 20,
+    filters?: { search?: string; status?: string; gender?: string }
+) => {
+    const query: Record<string, any> = {};
+    if (filters?.search) {
+        const re = new RegExp(filters.search, "i");
+        query.$or = [
+            { firstName: re },
+            { lastName: re },
+            { email: re },
+            { phone: re },
+        ];
+    }
+    if (filters?.status) query.membershipStatus = filters.status;
+    if (filters?.gender) query.gender = filters.gender;
 
-    const result = await paginate(Member, {}, page, limit, { createdAt: -1 });
-
+    const result = await paginate(Member, query, page, limit, { createdAt: -1 });
     return result;
 };
 

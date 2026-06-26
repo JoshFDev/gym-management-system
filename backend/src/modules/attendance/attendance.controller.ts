@@ -46,6 +46,7 @@ export const getAll = asyncHandler(
             dateFrom: req.query.dateFrom as string | undefined,
             dateTo: req.query.dateTo as string | undefined,
             search: req.query.search as string | undefined,
+            memberId: req.query.memberId as string | undefined,
         };
         const result = await getAttendances(page, limit, filters);
 
