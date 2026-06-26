@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { MembershipStatus } from "./member.types";
 
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
+
 export const createMemberSchema = z.object({
     firstName: z
         .string()
@@ -28,10 +30,11 @@ export const createMemberSchema = z.object({
 
     birthDate: z
         .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "birthDate must be YYYY-MM-DD.")
         .optional(),
 
     gender: z
-        .string()
+        .enum(["male", "female", "other"])
         .optional(),
 
     address: z

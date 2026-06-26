@@ -5,14 +5,12 @@ import {
     PaymentStatus,
 } from "./payment.types";
 
-export const createPaymentSchema = z.object({
-    memberId: z
-        .string()
-        .min(1, "Member ID is required."),
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
 
-    subscriptionId: z
-        .string()
-        .min(1, "Subscription ID is required."),
+export const createPaymentSchema = z.object({
+    memberId: objectId,
+
+    subscriptionId: objectId,
 
     amount: z
         .number()

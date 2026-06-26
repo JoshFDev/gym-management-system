@@ -204,7 +204,7 @@ export default function PaymentsPage() {
                 setTotalPages(paymentsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setSubscriptions(subsRes.data ?? []);
-            } catch { /* ignore */ } finally { setLoading(false); }
+            } catch { addToast("Error al cargar datos", "error"); } finally { setLoading(false); }
         };
         init();
     }, [page]);

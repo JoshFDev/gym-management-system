@@ -16,9 +16,11 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const response = await loginRequest({ email, password });
-            localStorage.setItem("token", response.data.token);
-            localStorage.setItem("user", JSON.stringify(response.data.user));
-            navigate(response.data.user.role === "trainer" ? "/members" : "/dashboard");
+            const { token, user } = response.data;
+            if (!token || !user?.role) { setError("Respuesta del servidor inválida"); return; }
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(user));
+            navigate(user.role === "trainer" ? "/members" : "/dashboard");
         } catch {
             setError("Correo o contraseña incorrectos.");
         } finally {

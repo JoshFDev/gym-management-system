@@ -22,13 +22,14 @@ export const toAttendanceResponse = (
 ): AttendanceResponse => ({
     id: attendance._id.toString(),
 
-    member: {
-        id: attendance.memberId._id.toString(),
-        fullName:
-            `${attendance.memberId.firstName} ${attendance.memberId.lastName}`,
-        email: attendance.memberId.email,
-        phone: attendance.memberId.phone,
-    },
+    member: attendance.memberId?._id
+        ? {
+            id: attendance.memberId._id.toString(),
+            fullName: `${attendance.memberId.firstName ?? ""} ${attendance.memberId.lastName ?? ""}`.trim() || "—",
+            email: attendance.memberId.email,
+            phone: attendance.memberId.phone,
+        }
+        : { id: attendance.memberId?.toString?.() ?? "—", fullName: "—" },
 
     checkInAt: attendance.checkInAt,
     checkOutAt: attendance.checkOutAt ?? undefined,

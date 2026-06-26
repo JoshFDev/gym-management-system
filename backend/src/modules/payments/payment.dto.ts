@@ -32,20 +32,23 @@ export const toPaymentResponse = (
 ): PaymentResponse => ({
     id: payment._id.toString(),
 
-    member: {
-        id: payment.memberId._id.toString(),
-        fullName:
-            `${payment.memberId.firstName} ${payment.memberId.lastName}`,
-        email: payment.memberId.email,
-        phone: payment.memberId.phone,
-    },
+    member: payment.memberId?._id
+        ? {
+            id: payment.memberId._id.toString(),
+            fullName: `${payment.memberId.firstName ?? ""} ${payment.memberId.lastName ?? ""}`.trim() || "—",
+            email: payment.memberId.email,
+            phone: payment.memberId.phone,
+        }
+        : { id: payment.memberId?.toString?.() ?? "—", fullName: "—" },
 
-    subscription: {
-        id: payment.subscriptionId._id.toString(),
-        startDate: payment.subscriptionId.startDate,
-        endDate: payment.subscriptionId.endDate,
-        status: payment.subscriptionId.status,
-    },
+    subscription: payment.subscriptionId?._id
+        ? {
+            id: payment.subscriptionId._id.toString(),
+            startDate: payment.subscriptionId.startDate,
+            endDate: payment.subscriptionId.endDate,
+            status: payment.subscriptionId.status,
+        }
+        : { id: payment.subscriptionId?.toString?.() ?? "—", startDate: new Date(0), endDate: new Date(0), status: "—" },
 
     amount: payment.amount,
     method: payment.method,

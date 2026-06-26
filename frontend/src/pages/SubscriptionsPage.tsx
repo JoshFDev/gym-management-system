@@ -206,7 +206,7 @@ export default function SubscriptionsPage() {
                 setTotalPages(subsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setPlans((plansRes.data ?? []).filter((p: Plan) => p.status === "active"));
-            } catch { /* ignore */ } finally { setLoading(false); }
+            } catch { addToast("Error al cargar datos", "error"); } finally { setLoading(false); }
         };
         init();
     }, [page]);

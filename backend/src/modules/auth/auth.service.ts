@@ -8,6 +8,9 @@ import { generateToken } from "../../utils/jwt";
 import crypto from "crypto";
 import { sendMail } from "../../shared/utils/mail.util";
 
+const hashToken = (token: string) =>
+    crypto.createHash("sha256").update(token).digest("hex");
+
 export const registerUser = async (
     data: RegisterInput
 ) => {
@@ -86,7 +89,7 @@ export const forgotPassword = async (
         .randomBytes(32)
         .toString("hex");
 
-    user.resetPasswordToken = resetToken;
+    user.resetPasswordToken = hashToken(resetToken);
 
     user.resetPasswordExpires = new Date(
         Date.now() + 1000 * 60 * 15
@@ -119,7 +122,7 @@ export const resetPassword = async (
     password: string
 ) => {
     const user = await User.findOne({
-        resetPasswordToken: token,
+        resetPasswordToken: hashToken(token),
         resetPasswordExpires: {
             $gt: new Date(),
         },

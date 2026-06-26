@@ -1,9 +1,9 @@
 import { z } from "zod";
 
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
+
 export const createAttendanceSchema = z.object({
-    memberId: z
-        .string()
-        .min(1, "Member ID is required."),
+    memberId: objectId,
 });
 
 export type CreateAttendanceInput =

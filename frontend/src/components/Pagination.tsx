@@ -12,6 +12,22 @@ export default function Pagination({ page, totalPages, total, limit, onChange }:
     const from = (page - 1) * limit + 1;
     const to = Math.min(page * limit, total);
 
+    const getPages = () => {
+        const pages: (number | "...")[] = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            if (page > 3) pages.push("...");
+            const start = Math.max(2, page - 1);
+            const end = Math.min(totalPages - 1, page + 1);
+            for (let i = start; i <= end; i++) pages.push(i);
+            if (page < totalPages - 2) pages.push("...");
+            pages.push(totalPages);
+        }
+        return pages;
+    };
+
     return (
         <div style={s.wrap}>
             <p style={s.info}>{from}–{to} de {total}</p>
@@ -19,15 +35,15 @@ export default function Pagination({ page, totalPages, total, limit, onChange }:
                 <button style={s.btn} disabled={page <= 1} onClick={() => onChange(page - 1)}>
                     <i className="ti ti-chevron-left" style={{ fontSize: 12 }} aria-hidden />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                        key={p}
-                        style={{ ...s.btn, ...(p === page ? s.active : {}) }}
-                        onClick={() => onChange(p)}
-                    >
-                        {p}
-                    </button>
-                ))}
+                {getPages().map((p, i) =>
+                    p === "..." ? (
+                        <span key={`ellipsis-${i}`} style={{ ...s.btn, border: "none", cursor: "default", color: "#bbb" }}>…</span>
+                    ) : (
+                        <button key={p} style={{ ...s.btn, ...(p === page ? s.active : {}) }} onClick={() => onChange(p)}>
+                            {p}
+                        </button>
+                    )
+                )}
                 <button style={s.btn} disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
                     <i className="ti ti-chevron-right" style={{ fontSize: 12 }} aria-hidden />
                 </button>

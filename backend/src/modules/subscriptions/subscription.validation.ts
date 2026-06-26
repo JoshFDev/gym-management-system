@@ -1,13 +1,11 @@
 import { z } from "zod";
 
-export const createSubscriptionSchema = z.object({
-    memberId: z
-        .string()
-        .min(1, "Member ID is required."),
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
 
-    planId: z
-        .string()
-        .min(1, "Plan ID is required."),
+export const createSubscriptionSchema = z.object({
+    memberId: objectId,
+
+    planId: objectId,
 
     startDate: z
         .string()
