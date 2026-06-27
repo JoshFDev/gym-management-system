@@ -82,7 +82,7 @@ export default function FloatingQrScanner() {
 
 const s: Record<string, React.CSSProperties> = {
     toggle: {
-        position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+        position: "fixed", bottom: 24, right: 24, zIndex: 500,
         width: 44, height: 44, borderRadius: "50%",
         border: "none", color: "#fff", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -90,7 +90,7 @@ const s: Record<string, React.CSSProperties> = {
         transition: "background 0.2s",
     },
     panel: {
-        position: "fixed", bottom: 80, right: 24, zIndex: 9998,
+        position: "fixed", bottom: 80, right: 24, zIndex: 499,
         width: 260, background: "#fff", borderRadius: 10,
         border: "1px solid #E5E4E2", boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
         overflow: "hidden",

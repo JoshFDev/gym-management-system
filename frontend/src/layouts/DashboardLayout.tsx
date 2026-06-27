@@ -41,6 +41,7 @@ export default function DashboardLayout() {
     const { user, role } = useAuth();
     const [logoutConfirm, setLogoutConfirm] = useState(false);
     const [showAbout, setShowAbout] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         const token = getStoredToken();
@@ -80,19 +81,31 @@ export default function DashboardLayout() {
 
     return (
         <div style={s.wrap}>
-            <aside style={s.sidebar}>
-                {/* Logo */}
-                <div style={s.logo}>
-                    <p style={s.logoName}>Gym Manager</p>
-                    <p style={s.logoTag}>Panel de administración</p>
+            {/* Overlay for mobile sidebar */}
+            <div className="sidebar-backdrop" style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 899,
+                opacity: sidebarOpen ? 1 : 0, pointerEvents: sidebarOpen ? "all" : "none",
+                transition: "opacity 0.2s ease",
+            } as React.CSSProperties} onClick={() => setSidebarOpen(false)} aria-hidden />
+
+            <aside className="sidebar" style={s.sidebar} data-open={sidebarOpen}>
+                <div style={{ ...s.logo, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                        <p style={s.logoName}>Gym Manager</p>
+                        <p style={s.logoTag}>Panel de administración</p>
+                    </div>
+                    <button className="sidebar-close" style={{ background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" } as React.CSSProperties}
+                        onClick={() => setSidebarOpen(false)}>
+                        <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden />
+                    </button>
                 </div>
 
-                {/* Nav filtrado por rol */}
                 <nav style={s.nav}>
                     {visibleItems.map((item) => (
                         <NavLink
                             key={item.to}
                             to={item.to}
+                            onClick={() => setSidebarOpen(false)}
                             style={({ isActive }) => ({
                                 ...s.navItem,
                                 ...(isActive ? s.navItemActive : {}),
@@ -104,7 +117,6 @@ export default function DashboardLayout() {
                     ))}
                 </nav>
 
-                {/* Usuario actual */}
                 <div style={s.sidebarFooter}>
                     {user && (
                         <div style={s.userInfo}>
@@ -129,6 +141,12 @@ export default function DashboardLayout() {
             </aside>
 
             <main style={s.main}>
+                <div className="top-bar" style={{ display: "flex", alignItems: "center", height: 48, flexShrink: 0, justifyContent: "flex-start" } as React.CSSProperties}>
+                    <button className="hamburger-btn" style={{ background: "none", border: "none", cursor: "pointer", color: "#888", padding: "6px 12px", display: "flex", alignItems: "center", justifyContent: "center" } as React.CSSProperties}
+                        onClick={() => setSidebarOpen(true)}>
+                        <i className="ti ti-menu-2" style={{ fontSize: 20 }} aria-hidden />
+                    </button>
+                </div>
                 <Outlet />
                 {role && (role === "admin" || role === "receptionist") && <FloatingQrScanner />}
             </main>
@@ -161,6 +179,33 @@ export default function DashboardLayout() {
                     </div>
                 </div>
             )}
+
+            <style>{`
+                .sidebar {
+                    position: fixed !important;
+                    left: 0; top: 0; bottom: 0;
+                    transform: translateX(-100%);
+                    z-index: 900;
+                    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+                }
+                .sidebar[data-open="true"] {
+                    transform: translateX(0);
+                }
+                .sidebar-close { display: flex !important; }
+                .hamburger-btn { display: flex !important; }
+                .top-bar { display: flex !important; }
+                @media (min-width: 900px) {
+                    .sidebar {
+                        position: static !important;
+                        transform: none !important;
+                        transition: none !important;
+                    }
+                    .sidebar-backdrop { display: none !important; }
+                    .sidebar-close { display: none !important; }
+                    .hamburger-btn { display: none !important; }
+                    .top-bar { display: none !important; }
+                }
+            `}</style>
         </div>
     );
 }
@@ -182,7 +227,7 @@ const s: Record<string, React.CSSProperties> = {
     userRole:     { fontSize: 11, color: "#bbb", margin: 0 },
     logoutBtn:    { display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#bbb", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" },
     helpBtn:      { display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#bbb", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit", opacity: 0.7 },
-    main:         { flex: 1, minWidth: 0, overflowY: "auto" },
+    main:         { flex: 1, minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column" },
     overlay:      { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
     confirmBox:   { background: "#fff", borderRadius: 10, padding: "22px 24px", minWidth: 280, boxShadow: "0 6px 24px rgba(0,0,0,0.12)" },
     confirmTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },

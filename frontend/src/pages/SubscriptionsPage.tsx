@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { getSubscriptions, createSubscription, renewSubscription } from "../services/subscription.service";
 import { getMembers } from "../services/member.service";
 import { getPlans } from "../services/plan.service";
@@ -121,6 +124,50 @@ const validate = (values: { memberId: string; planId: string }): FormErrors => {
     return e;
 };
 
+const daysLabel = (days: number, status: string) => {
+    if (status === "expired") return "Vencida";
+    if (days <= 0) return "Hoy";
+    return `${days} días`;
+};
+
+function exportExcel(subscriptions: Subscription[]) {
+    const rows = subscriptions.map((sub) => ({
+        Miembro: sub.member.fullName, Email: sub.member.email ?? "", Teléfono: sub.member.phone ?? "",
+        Plan: sub.plan.name, Precio: sub.plan.price,
+        Inicio: new Date(sub.startDate).toLocaleDateString("es-MX"),
+        Vencimiento: new Date(sub.endDate).toLocaleDateString("es-MX"),
+        "Días restantes": daysLeft(sub.endDate),
+        Estado: statusLabel[sub.status] ?? sub.status,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Suscripciones");
+    XLSX.writeFile(wb, `ZenithGym_Suscripciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function exportPDF(subscriptions: Subscription[]) {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(26, 26, 26);
+    doc.text("ZenithGym · Lista de suscripciones", 14, 16);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(136, 136, 136);
+    doc.text(`Generado el ${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })} · ${subscriptions.length} suscripción${subscriptions.length !== 1 ? "es" : ""}`, 14, 22);
+    autoTable(doc, {
+        startY: 28, head: [["Miembro", "Email", "Plan", "Precio", "Inicio", "Vencimiento", "Días rest.", "Estado"]],
+        body: subscriptions.map((sub) => [
+            sub.member.fullName, sub.member.email ?? "—", sub.plan.name, `$${sub.plan.price}`,
+            new Date(sub.startDate).toLocaleDateString("es-MX"),
+            new Date(sub.endDate).toLocaleDateString("es-MX"),
+            daysLabel(daysLeft(sub.endDate), sub.status),
+            statusLabel[sub.status] ?? sub.status,
+        ]),
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 3, textColor: [26, 26, 26] },
+        headStyles: { fillColor: [250, 250, 250], textColor: [136, 136, 136], fontStyle: "normal", lineWidth: 0.1, lineColor: [229, 228, 226] },
+        alternateRowStyles: { fillColor: [252, 252, 251] }, tableLineColor: [229, 228, 226], tableLineWidth: 0.1,
+    });
+    doc.save(`ZenithGym_Suscripciones_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 export default function SubscriptionsPage() {
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [members, setMembers] = useState<Member[]>([]);
@@ -211,6 +258,12 @@ export default function SubscriptionsPage() {
                 onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Suscripciones" action={<GymButton icon="ti-plus" onClick={openNew}>Nueva suscripción</GymButton>} />
             <div style={s.content}>
+                {!loading && subscriptions.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button style={s.exportBtn} onClick={() => exportExcel(subscriptions)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
+                        <button style={s.exportBtn} onClick={() => exportPDF(subscriptions)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
+                    </div>
+                )}
                 {loading ? (
                     <p style={s.empty}>Cargando suscripciones…</p>
                 ) : subscriptions.length === 0 ? (
@@ -286,6 +339,7 @@ const s: Record<string, React.CSSProperties> = {
     btnConfirm: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", minWidth: 110 },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
     btnAction: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "6px 11px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
     card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
     table: { width: "100%", borderCollapse: "collapse" },

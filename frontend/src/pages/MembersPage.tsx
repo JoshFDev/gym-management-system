@@ -282,6 +282,21 @@ function exportPDF(members: Member[]) {
     doc.save(`ZenithGym_Miembros_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+const playConfirmSound = () => {
+    try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 660;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch { /* ignore */ }
+};
+
 const emptyForm = { firstName: "", lastName: "", email: "", password: "", phone: "", gender: "", birthDate: "", address: "", emergencyContact: "", notes: "" };
 
 export default function MembersPage() {
@@ -304,6 +319,10 @@ export default function MembersPage() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState<Member | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
+
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
 
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -375,7 +394,28 @@ export default function MembersPage() {
             <ConfirmModal open={confirmOpen} title={isDeactivating ? "Desactivar miembro" : "Activar miembro"}
                 body={isDeactivating ? `${confirmTarget?.firstName} ${confirmTarget?.lastName} perderá acceso al gimnasio.` : `${confirmTarget?.firstName} ${confirmTarget?.lastName} volverá a tener acceso activo.`}
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}
-                loading={confirmLoading} onConfirm={confirmToggle} onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }} />
+                loading={confirmLoading} onConfirm={() => { playConfirmSound(); confirmToggle(); }} onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }} />
+
+            <ConfirmModal open={bulkConfirmOpen} title="Desactivar miembros"
+                body={`¿Desactivar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Perderán acceso al gimnasio.`}
+                confirmLabel="Sí, desactivar todos" confirmColor="#c0392b"
+                loading={bulkDeleting}
+                onConfirm={async () => {
+                    playConfirmSound();
+                    setBulkDeleting(true);
+                    try {
+                        await Promise.all(selectedIds.map((id) => updateMember(id, { membershipStatus: "inactive" })));
+                        addToast(`${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} desactivado${selectedIds.length !== 1 ? "s" : ""}`);
+                        setSelectedIds([]);
+                        await loadMembers(page);
+                    } catch {
+                        addToast("Error al desactivar miembros.", "error");
+                    } finally {
+                        setBulkDeleting(false);
+                        setBulkConfirmOpen(false);
+                    }
+                }}
+                onCancel={() => setBulkConfirmOpen(false)} />
             <MemberDetailDrawer member={viewMember} open={!!viewMember} onClose={() => setViewMember(null)}
                 onEdit={() => { if (viewMember) { openEdit(viewMember); setViewMember(null); } }} />
             <MemberDrawer open={drawerOpen} editingId={editingId} saving={saving} values={formValues} errors={errors} touched={touched}
@@ -408,14 +448,41 @@ export default function MembersPage() {
                         {hasFilters && <button style={{ ...s.btnClear, marginTop: 12 }} onClick={clearFilters}>Quitar filtros</button>}
                     </div>
                 ) : (
-                    <>
+                    {selectedIds.length > 0 && (
+                        <div style={s.bulkBar}>
+                            <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>
+                                {selectedIds.length} seleccionado{selectedIds.length !== 1 ? "s" : ""}
+                            </span>
+                            <button style={s.bulkDeleteBtn} onClick={() => setBulkConfirmOpen(true)}>
+                                <i className="ti ti-user-off" style={{ fontSize: 13 }} aria-hidden />
+                                Desactivar seleccionados
+                            </button>
+                            <button style={s.bulkCancelBtn} onClick={() => setSelectedIds([])}>
+                                Cancelar
+                            </button>
+                        </div>
+                    )}
                     <div style={{ ...s.card, padding: 0 }}>
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
+                                <th style={{ ...s.th, width: 36 }}>
+                                    <input type="checkbox" checked={selectedIds.length === members.length && members.length > 0}
+                                        onChange={(e) => setSelectedIds(e.target.checked ? members.map((m) => m.id) : [])}
+                                        style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
+                                </th>
                                 <th style={s.th}>Miembro</th><th style={s.th}>Correo</th><th style={s.th}>Teléfono</th><th style={s.th}>Género</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
                             </tr></thead>
-                            <tbody>{members.map((m) => (
+                            <tbody>{members.map((m) => {
+                                const checked = selectedIds.includes(m.id);
+                                return (
                                 <tr key={m.id} style={s.row} className="member-row">
+                                    <td style={{ ...s.td, width: 36 }}>
+                                        <input type="checkbox" checked={checked}
+                                            onChange={() => setSelectedIds((prev) =>
+                                                checked ? prev.filter((id) => id !== m.id) : [...prev, m.id]
+                                            )}
+                                            style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
+                                    </td>
                                     <td style={s.td}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                             <div style={{ ...s.avatar, background: m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE", color: m.membershipStatus === "inactive" ? "#c0392b" : "#666" }}>{initials(m.firstName, m.lastName)}</div>
@@ -438,7 +505,8 @@ export default function MembersPage() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}</tbody>
+                                );
+                            })}</tbody>
                         </table>
                     </div>
                     {!loading && (
@@ -501,4 +569,20 @@ const s: Record<string, React.CSSProperties> = {
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     emptyState: { display: "flex", flexDirection: "column", alignItems: "center", padding: "52px 0", background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8 },
     btnAction: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "6px 11px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    bulkBar: {
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#FFF4F0", border: "1px solid #fecaca", borderRadius: 8,
+        padding: "10px 14px",
+    },
+    bulkDeleteBtn: {
+        display: "inline-flex", alignItems: "center", gap: 6,
+        background: "#c0392b", color: "#fff", border: "none", borderRadius: 6,
+        padding: "7px 14px", fontSize: 12, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer",
+    },
+    bulkCancelBtn: {
+        background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 6,
+        padding: "7px 14px", fontSize: 12, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer",
+    },
 };

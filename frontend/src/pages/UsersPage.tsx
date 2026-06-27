@@ -63,6 +63,21 @@ const initials = (f: string, l: string) => `${f?.[0] ?? ""}${l?.[0] ?? ""}`.toUp
 const fmtDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
+const playConfirmSound = () => {
+    try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 660;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch { /* ignore */ }
+};
+
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
@@ -367,6 +382,12 @@ export default function UsersPage() {
 
     // Filtro rápido por rol
     const [filterRole, setFilterRole] = useState("");
+    const [showInactive, setShowInactive] = useState(false);
+
+    // Selección múltiple
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
     const { addToast } = useToast();
     useUnsavedChanges(formOpen);
@@ -385,10 +406,12 @@ export default function UsersPage() {
     }, []);
 
     // Filtrado
-    const filtered = useMemo(() =>
-        filterRole ? users.filter((u) => u.role === filterRole) : users,
-        [users, filterRole]
-    );
+    const filtered = useMemo(() => {
+        let list = users;
+        if (filterRole) list = list.filter((u) => u.role === filterRole);
+        if (!showInactive) list = list.filter((u) => u.isActive !== false);
+        return list;
+    }, [users, filterRole, showInactive]);
 
     // Form helpers
     const openNew = () => {
@@ -481,12 +504,42 @@ export default function UsersPage() {
         <div style={s.page}>
             <ConfirmModal
                 open={!!deleteTarget}
-                title="Eliminar usuario"
-                body={`¿Eliminar a ${deleteTarget?.firstName} ${deleteTarget?.lastName}? Esta acción no se puede deshacer.`}
-                confirmLabel="Sí, eliminar"
+                title={deleteTarget?.isActive !== false ? "Desactivar usuario" : "Eliminar usuario"}
+                body={deleteTarget?.isActive !== false
+                    ? `¿Desactivar a ${deleteTarget?.firstName} ${deleteTarget?.lastName}? El usuario ya no podrá iniciar sesión.`
+                    : `¿Eliminar a ${deleteTarget?.firstName} ${deleteTarget?.lastName}? Esta acción no se puede deshacer.`
+                }
+                confirmLabel={deleteTarget?.isActive !== false ? "Sí, desactivar" : "Sí, eliminar"}
                 loading={deleteLoading}
-                onConfirm={confirmDelete}
+                onConfirm={() => {
+                    playConfirmSound();
+                    confirmDelete();
+                }}
                 onCancel={() => setDeleteTarget(null)}
+            />
+
+            <ConfirmModal
+                open={bulkConfirmOpen}
+                title="Desactivar usuarios"
+                body={`¿Desactivar ${selectedIds.length} usuario${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? No podrán iniciar sesión.`}
+                confirmLabel="Sí, desactivar todos"
+                loading={bulkDeleting}
+                onConfirm={async () => {
+                    playConfirmSound();
+                    setBulkDeleting(true);
+                    try {
+                        await Promise.all(selectedIds.map((id) => deleteUser(id)));
+                        addToast(`${selectedIds.length} usuario${selectedIds.length !== 1 ? "s" : ""} desactivado${selectedIds.length !== 1 ? "s" : ""}`);
+                        setSelectedIds([]);
+                        await loadUsers();
+                    } catch {
+                        addToast("Error al desactivar usuarios.", "error");
+                    } finally {
+                        setBulkDeleting(false);
+                        setBulkConfirmOpen(false);
+                    }
+                }}
+                onCancel={() => setBulkConfirmOpen(false)}
             />
 
             <UserDetailDrawer
@@ -574,19 +627,47 @@ export default function UsersPage() {
                     })}
                 </div>
 
-                {/* Contador */}
+                {/* Contador + mostrar inactivos */}
                 {!loading && (
-                    <p style={s.resultCount}>
-                        {filterRole
-                            ? `${filtered.length} ${ROLE_LABEL[filterRole as UserRole].toLowerCase()}${filtered.length !== 1 ? "s" : ""}`
-                            : `${users.length} usuario${users.length !== 1 ? "s" : ""} en total`
-                        }
-                        {filterRole && (
-                            <button style={s.btnInlineReset} onClick={() => setFilterRole("")}>
-                                · Ver todos
-                            </button>
-                        )}
-                    </p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                        <p style={s.resultCount}>
+                            {filterRole
+                                ? `${filtered.length} ${ROLE_LABEL[filterRole as UserRole].toLowerCase()}${filtered.length !== 1 ? "s" : ""}`
+                                : `${filtered.length} usuario${filtered.length !== 1 ? "s" : ""}`
+                            }
+                            {!showInactive && !filterRole && users.filter((u) => u.isActive === false).length > 0 && (
+                                <span style={{ color: "#bbb", marginLeft: 4 }}>
+                                    · {users.filter((u) => u.isActive === false).length} inactivo{users.filter((u) => u.isActive === false).length !== 1 ? "s" : ""}
+                                </span>
+                            )}
+                            {filterRole && (
+                                <button style={s.btnInlineReset} onClick={() => setFilterRole("")}>
+                                    · Ver todos
+                                </button>
+                            )}
+                        </p>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#888", userSelect: "none" }}>
+                            <input type="checkbox" checked={showInactive} onChange={(e) => { setShowInactive(e.target.checked); setSelectedIds([]); }}
+                                style={{ accentColor: "#1a1a1a", cursor: "pointer" }} />
+                            Mostrar inactivos
+                        </label>
+                    </div>
+                )}
+
+                {/* Barra de eliminación masiva */}
+                {selectedIds.length > 0 && (
+                    <div style={s.bulkBar}>
+                        <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>
+                            {selectedIds.length} seleccionado{selectedIds.length !== 1 ? "s" : ""}
+                        </span>
+                        <button style={s.bulkDeleteBtn} onClick={() => setBulkConfirmOpen(true)}>
+                            <i className="ti ti-trash" style={{ fontSize: 13 }} aria-hidden />
+                            Eliminar seleccionados
+                        </button>
+                        <button style={s.bulkCancelBtn} onClick={() => setSelectedIds([])}>
+                            Cancelar
+                        </button>
+                    </div>
                 )}
 
                 {/* Tabla */}
@@ -602,6 +683,11 @@ export default function UsersPage() {
                         <table style={s.table}>
                             <thead>
                                 <tr style={s.thead}>
+                                    <th style={{ ...s.th, width: 36 }}>
+                                        <input type="checkbox" checked={selectedIds.length === filtered.length && filtered.length > 0}
+                                            onChange={(e) => setSelectedIds(e.target.checked ? filtered.map((u) => u.id) : [])}
+                                            style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
+                                    </th>
                                     <th style={s.th}>Usuario</th>
                                     <th style={s.th}>Correo</th>
                                     <th style={s.th}>Rol</th>
@@ -614,8 +700,16 @@ export default function UsersPage() {
                                 {filtered.map((u) => {
                                     const rc = ROLE_COLOR[u.role];
                                     const isActive = u.isActive !== false;
+                                    const checked = selectedIds.includes(u.id);
                                     return (
-                                        <tr key={u.id} style={s.row} className="user-row">
+                                        <tr key={u.id} style={{ ...s.row, opacity: isActive ? 1 : 0.6 }} className="user-row">
+                                            <td style={{ ...s.td, width: 36 }}>
+                                                <input type="checkbox" checked={checked}
+                                                    onChange={() => setSelectedIds((prev) =>
+                                                        checked ? prev.filter((id) => id !== u.id) : [...prev, u.id]
+                                                    )}
+                                                    style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
+                                            </td>
                                             <td style={s.td}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                                     <div style={{ ...sd.avatar, background: rc.bg, color: rc.color }}>
@@ -650,10 +744,11 @@ export default function UsersPage() {
                                                         Editar
                                                     </button>
                                                     <button
-                                                        style={{ ...s.btnAction, color: "#c0392b", borderColor: "#fecaca" }}
+                                                        style={{ ...s.btnAction, color: isActive ? "#854F0B" : "#c0392b", borderColor: isActive ? "#FDE68A" : "#fecaca" }}
                                                         onClick={() => setDeleteTarget(u)}
                                                     >
-                                                        <i className="ti ti-trash" style={{ fontSize: 13 }} aria-hidden />
+                                                        <i className={`ti ${isActive ? "ti-user-x" : "ti-trash"}`} style={{ fontSize: 13 }} aria-hidden />
+                                                        {isActive ? "Desactivar" : "Eliminar"}
                                                     </button>
                                                 </div>
                                             </td>
@@ -820,6 +915,22 @@ const s: Record<string, React.CSSProperties> = {
         animation: "spin 0.7s linear infinite",
     },
 
+    bulkBar: {
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#FFF4F0", border: "1px solid #fecaca", borderRadius: 8,
+        padding: "10px 14px",
+    },
+    bulkDeleteBtn: {
+        display: "inline-flex", alignItems: "center", gap: 6,
+        background: "#c0392b", color: "#fff", border: "none", borderRadius: 6,
+        padding: "7px 14px", fontSize: 12, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer",
+    },
+    bulkCancelBtn: {
+        background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 6,
+        padding: "7px 14px", fontSize: 12, fontWeight: 500,
+        fontFamily: "inherit", cursor: "pointer",
+    },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     emptyState: {
         display: "flex", flexDirection: "column", alignItems: "center",

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useToast } from "../hooks/useToast";
 import { createPayment, getPayments } from "../services/payment.service";
 import { getMembers } from "../services/member.service";
@@ -220,6 +223,43 @@ const validate = (values: Record<string, string>): FormErrors => {
     return e;
 };
 
+function exportExcel(payments: Payment[]) {
+    const rows = payments.map((p) => ({
+        Miembro: p.member.fullName, Email: p.member.email ?? "", Teléfono: p.member.phone ?? "",
+        Monto: p.amount, Método: methodLabel[p.method] ?? p.method, Estado: statusLabel[p.status] ?? p.status,
+        "Fecha de pago": new Date(p.paidAt).toLocaleDateString("es-MX"),
+        "Vence suscripción": new Date(p.subscription.endDate).toLocaleDateString("es-MX"),
+        Notas: p.notes ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 24 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pagos");
+    XLSX.writeFile(wb, `ZenithGym_Pagos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function exportPDF(payments: Payment[]) {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(26, 26, 26);
+    doc.text("ZenithGym · Lista de pagos", 14, 16);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(136, 136, 136);
+    doc.text(`Generado el ${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })} · ${payments.length} pago${payments.length !== 1 ? "s" : ""}`, 14, 22);
+    autoTable(doc, {
+        startY: 28, head: [["Miembro", "Email", "Monto", "Método", "Estado", "Fecha de pago", "Vence suscripción", "Notas"]],
+        body: payments.map((p) => [
+            p.member.fullName, p.member.email ?? "—", `$${p.amount}`,
+            methodLabel[p.method] ?? p.method, statusLabel[p.status] ?? p.status,
+            new Date(p.paidAt).toLocaleDateString("es-MX"),
+            new Date(p.subscription.endDate).toLocaleDateString("es-MX"),
+            p.notes ?? "—",
+        ]),
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 3, textColor: [26, 26, 26] },
+        headStyles: { fillColor: [250, 250, 250], textColor: [136, 136, 136], fontStyle: "normal", lineWidth: 0.1, lineColor: [229, 228, 226] },
+        alternateRowStyles: { fillColor: [252, 252, 251] }, tableLineColor: [229, 228, 226], tableLineWidth: 0.1,
+    });
+    doc.save(`ZenithGym_Pagos_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 const emptyForm = { memberId: "", subscriptionId: "", amount: "", method: "", notes: "", cardNumber: "", cardExpiry: "", cardCvc: "", cardName: "" };
 
 export default function PaymentsPage() {
@@ -388,6 +428,9 @@ export default function PaymentsPage() {
                     {hasActiveFilters && (
                         <button style={s.clearBtn} onClick={clearFilters}>Limpiar filtros</button>
                     )}
+                    <span style={{ flex: 1 }} />
+                    <button style={s.exportBtn} onClick={() => exportExcel(payments)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
+                    <button style={s.exportBtn} onClick={() => exportPDF(payments)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
                 </div>
                 {loading ? (
                     <p style={s.empty}>Cargando pagos…</p>
@@ -439,6 +482,7 @@ const s: Record<string, React.CSSProperties> = {
     filterInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, minWidth: 120 },
     filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" },
     clearBtn: { background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
+    exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
     ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
     toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
     toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
