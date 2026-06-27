@@ -15,6 +15,8 @@ export interface PaymentResponse {
         startDate: Date;
         endDate: Date;
         status: string;
+        planName: string;
+        planPrice: number;
     };
 
     amount: number;
@@ -47,8 +49,10 @@ export const toPaymentResponse = (
             startDate: payment.subscriptionId.startDate,
             endDate: payment.subscriptionId.endDate,
             status: payment.subscriptionId.status,
+            planName: payment.subscriptionId.planId?.name ?? "",
+            planPrice: payment.subscriptionId.planId?.price ?? 0,
         }
-        : { id: payment.subscriptionId?.toString?.() ?? "—", startDate: new Date(0), endDate: new Date(0), status: "—" },
+        : { id: payment.subscriptionId?.toString?.() ?? "—", startDate: new Date(0), endDate: new Date(0), status: "—", planName: "", planPrice: 0 },
 
     amount: payment.amount,
     method: payment.method,

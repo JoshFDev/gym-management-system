@@ -5,10 +5,25 @@ import { toPaymentResponse } from "./payment.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
+import { sendMail } from "../../shared/utils/mail.util";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
         const payment = await createPayment(req.body);
+
+        const memberEmail = (payment as any).memberId?.email;
+        if (memberEmail) {
+            const planName = (payment as any).subscriptionId?.planId?.name ?? "Plan";
+            const amount = payment.amount;
+            const endDate = (payment as any).subscriptionId?.endDate
+                ? new Date((payment as any).subscriptionId.endDate).toLocaleDateString("es-ES")
+                : "";
+            sendMail(
+                memberEmail,
+                "Confirmación de pago - ZenithGym",
+                `<p>Gracias por tu pago.</p><p>Plan: ${planName}</p><p>Monto: $${amount}</p><p>Fecha de fin de suscripción: ${endDate}</p>`
+            ).catch(() => {});
+        }
 
         await logAudit({
             action: "CREATE",
@@ -28,18 +43,7 @@ export const create = asyncHandler(
         res.status(201).json({
             success: true,
             message: "Payment registered successfully.",
-            data: {
-                id: payment._id.toString(),
-                memberId: payment.memberId.toString(),
-                subscriptionId: payment.subscriptionId.toString(),
-                amount: payment.amount,
-                method: payment.method,
-                status: payment.status,
-                paidAt: payment.paidAt,
-                notes: payment.notes,
-                createdAt: payment.createdAt,
-                updatedAt: payment.updatedAt,
-            },
+            data: toPaymentResponse(payment),
         });
     }
 );
@@ -49,7 +53,12 @@ export const getAll = asyncHandler(
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
         const memberId = req.query.memberId as string | undefined;
-        const result = await getPayments(page, limit, memberId);
+        const search = req.query.search as string | undefined;
+        const status = req.query.status as string | undefined;
+        const planId = req.query.planId as string | undefined;
+        const dateFrom = req.query.dateFrom as string | undefined;
+        const dateTo = req.query.dateTo as string | undefined;
+        const result = await getPayments(page, limit, memberId, search, status, planId, dateFrom, dateTo);
         res.status(200).json({
             success: true,
             data: result.items.map(toPaymentResponse),

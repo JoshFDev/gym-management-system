@@ -22,10 +22,10 @@ const NAV_ITEMS: NavItem[] = [
     { to: "/dashboard",    icon: "ti-layout-dashboard", label: "Dashboard",     roles: ["admin", "receptionist"] },
     { to: "/members",      icon: "ti-users",            label: "Miembros",      roles: ["admin", "receptionist", "trainer"] },
     { to: "/plans",        icon: "ti-clipboard-list",   label: "Planes",        roles: ["admin"] },
-    { to: "/classes",      icon: "ti-calendar",         label: "Clases",        roles: ["admin", "receptionist", "trainer"] },
     { to: "/subscriptions",icon: "ti-id-badge",         label: "Suscripciones", roles: ["admin", "receptionist"] },
     { to: "/payments",     icon: "ti-credit-card",      label: "Pagos",         roles: ["admin", "receptionist"] },
     { to: "/attendance",   icon: "ti-scan",             label: "Asistencia",    roles: ["admin", "receptionist", "trainer"] },
+    { to: "/classes",      icon: "ti-calendar",         label: "Clases",        roles: ["admin", "receptionist", "trainer"] },
     { to: "/users",        icon: "ti-shield-lock",      label: "Usuarios",      roles: ["admin"] },
     { to: "/audit-log",    icon: "ti-history",          label: "Auditoría",     roles: ["admin"] },
 ];
@@ -40,6 +40,7 @@ export default function DashboardLayout() {
     const navigate = useNavigate();
     const { user, role } = useAuth();
     const [logoutConfirm, setLogoutConfirm] = useState(false);
+    const [showAbout, setShowAbout] = useState(false);
 
     useEffect(() => {
         const token = getStoredToken();
@@ -120,6 +121,10 @@ export default function DashboardLayout() {
                         <i className="ti ti-logout" style={{ fontSize: 15 }} aria-hidden />
                         Cerrar sesión
                     </button>
+                    <button style={s.helpBtn} onClick={() => setShowAbout(true)}>
+                        <i className="ti ti-info-circle" style={{ fontSize: 15 }} aria-hidden />
+                        Acerca de
+                    </button>
                 </div>
             </aside>
 
@@ -136,6 +141,22 @@ export default function DashboardLayout() {
                         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
                             <button style={s.cancelBtn} onClick={() => setLogoutConfirm(false)}>Cancelar</button>
                             <button style={s.confirmBtn} onClick={handleLogout}>Salir</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAbout && (
+                <div style={s.overlay} onClick={() => setShowAbout(false)}>
+                    <div style={s.confirmBox} onClick={(e) => e.stopPropagation()}>
+                        <p style={s.confirmTitle}>Acerca de</p>
+                        <p style={s.confirmText}>
+                            <strong>Gym Manager</strong> — Sistema de administración para gimnasios.<br /><br />
+                            Versión 1.0.0<br />
+                            Desarrollado con React + TypeScript + Express + MongoDB.
+                        </p>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                            <button style={s.confirmBtn} onClick={() => setShowAbout(false)}>Cerrar</button>
                         </div>
                     </div>
                 </div>
@@ -160,6 +181,7 @@ const s: Record<string, React.CSSProperties> = {
     userName:     { fontSize: 12, fontWeight: 500, color: "#1a1a1a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
     userRole:     { fontSize: 11, color: "#bbb", margin: 0 },
     logoutBtn:    { display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#bbb", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" },
+    helpBtn:      { display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#bbb", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit", opacity: 0.7 },
     main:         { flex: 1, minWidth: 0, overflowY: "auto" },
     overlay:      { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
     confirmBox:   { background: "#fff", borderRadius: 10, padding: "22px 24px", minWidth: 280, boxShadow: "0 6px 24px rgba(0,0,0,0.12)" },

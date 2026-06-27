@@ -11,7 +11,7 @@ import { useSocketRefresh } from "../hooks/useSocketRefresh";
 interface Payment {
     id: string;
     member: { id: string; fullName: string; email?: string; phone?: string };
-    subscription: { id: string; startDate: string; endDate: string; status: string };
+    subscription: { id: string; startDate: string; endDate: string; status: string; planName?: string; planPrice?: number };
     amount: number;
     method: string;
     status: string;
@@ -63,9 +63,33 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
     const firstRef = useRef<HTMLSelectElement>(null);
     useEffect(() => { if (open) setTimeout(() => firstRef.current?.focus(), 300); }, [open]);
 
+    const [processing, setProcessing] = useState(false);
+    const [processed, setProcessed] = useState(false);
+
+    const selectedSub = memberSubscriptions.find(s => s.id === values.subscriptionId);
+
     const handleMemberChange = (id: string) => {
         onChange("memberId", id);
         onChange("subscriptionId", "");
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (values.method === "card") {
+            setProcessing(true);
+            await new Promise((r) => setTimeout(r, 2000));
+            setProcessing(false);
+            setProcessed(true);
+            return;
+        }
+        onSubmit(e);
+    };
+
+    const handleProceed = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setProcessed(false);
+        const synthetic = { preventDefault: () => {} } as React.FormEvent;
+        onSubmit(synthetic);
     };
 
     return (
@@ -79,7 +103,7 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
                     </div>
                     <button style={s.btnIcon} onClick={onClose}><i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden /></button>
                 </div>
-                <form onSubmit={onSubmit} style={s.drawerBody} noValidate>
+                <form onSubmit={handleSubmit} style={s.drawerBody} noValidate>
                     <Field label="Miembro" required error={errors.memberId} touched={touched.memberId}>
                         <select ref={firstRef} style={{ ...s.input, ...(touched.memberId && errors.memberId ? s.inputError : {}) }}
                             value={values.memberId} onChange={(e) => handleMemberChange(e.target.value)} onBlur={() => onBlur("memberId")}>
@@ -100,13 +124,18 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
                         </select>
                     </Field>
                     <Field label="Monto ($)" required error={errors.amount} touched={touched.amount}>
+                        {selectedSub && (
+                            <p style={{ margin: "0 0 2px", fontSize: 11, color: "#888" }}>
+                                Plan: ${selectedSub.plan.price} — {selectedSub.plan.name}
+                            </p>
+                        )}
                         <input style={{ ...s.input, ...(touched.amount && errors.amount ? s.inputError : {}) }}
-                            type="number" placeholder="450" value={values.amount}
+                            type="number" placeholder={selectedSub ? String(selectedSub.plan.price) : "450"} value={values.amount}
                             onChange={(e) => onChange("amount", e.target.value)} onBlur={() => onBlur("amount")} min={0} />
                     </Field>
                     <Field label="Método de pago" required error={errors.method} touched={touched.method}>
                         <select style={{ ...s.input, ...(touched.method && errors.method ? s.inputError : {}) }}
-                            value={values.method} onChange={(e) => onChange("method", e.target.value)} onBlur={() => onBlur("method")}>
+                            value={values.method} onChange={(e) => { onChange("method", e.target.value); setProcessed(false); }} onBlur={() => onBlur("method")}>
                             <option value="">Seleccionar método</option>
                             <option value="cash">Efectivo</option>
                             <option value="card">Tarjeta</option>
@@ -117,13 +146,64 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
                         <input style={s.input} placeholder="Notas opcionales" value={values.notes}
                             onChange={(e) => onChange("notes", e.target.value)} />
                     </Field>
-                    <div style={s.drawerFooter}>
-                        <button type="button" style={s.btnGhost} onClick={onClose} disabled={saving}>Cancelar</button>
-                        <button type="submit" style={{ ...s.btnPrimary, opacity: saving ? 0.7 : 1 }} disabled={saving}>
-                            {saving ? <><span style={s.spinner} />Guardando…</>
-                                : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Registrar pago</>}
-                        </button>
-                    </div>
+
+                    {values.method === "card" && !processed && (
+                        <div style={{ border: "1px solid #E5E4E2", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#555" }}>Datos de la tarjeta</p>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <label style={s.fieldLabel}>Número de tarjeta</label>
+                                <input style={s.input} placeholder="4242 4242 4242 4242" maxLength={19}
+                                    value={values.cardNumber ?? ""} onChange={(e) => {
+                                        const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                                        const formatted = raw.replace(/(.{4})/g, "$1 ").trim();
+                                        onChange("cardNumber", formatted);
+                                    }} />
+                            </div>
+                            <div style={{ display: "flex", gap: 10 }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+                                    <label style={s.fieldLabel}>Vencimiento</label>
+                                    <input style={s.input} placeholder="MM/AA" maxLength={5}
+                                        value={values.cardExpiry ?? ""} onChange={(e) => {
+                                            const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+                                            const formatted = raw.length > 2 ? raw.slice(0, 2) + "/" + raw.slice(2) : raw;
+                                            onChange("cardExpiry", formatted);
+                                        }} />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+                                    <label style={s.fieldLabel}>CVC</label>
+                                    <input style={s.input} placeholder="123" maxLength={4}
+                                        value={values.cardCvc ?? ""} onChange={(e) => {
+                                            onChange("cardCvc", e.target.value.replace(/\D/g, "").slice(0, 4));
+                                        }} />
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <label style={s.fieldLabel}>Titular</label>
+                                <input style={s.input} placeholder="Nombre en la tarjeta"
+                                    value={values.cardName ?? ""} onChange={(e) => onChange("cardName", e.target.value)} />
+                            </div>
+                        </div>
+                    )}
+
+                    {processed && (
+                        <div style={{ textAlign: "center", padding: "20px 0" }}>
+                            <div style={{ fontSize: 36, color: "#3a7d44", marginBottom: 8 }}>✓</div>
+                            <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>Pago procesado exitosamente</p>
+                            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#888" }}>Tarjeta terminada en ••••{values.cardNumber?.replace(/\s/g, "").slice(-4) ?? "4242"}</p>
+                            <button style={{ ...s.btnPrimary, marginTop: 16 }} onClick={handleProceed}>Confirmar y guardar</button>
+                        </div>
+                    )}
+
+                    {!(values.method === "card" && processed) && (
+                        <div style={s.drawerFooter}>
+                            <button type="button" style={s.btnGhost} onClick={onClose} disabled={saving || processing}>Cancelar</button>
+                            <button type="submit" style={{ ...s.btnPrimary, opacity: saving || processing ? 0.7 : 1 }} disabled={saving || processing}>
+                                {processing ? <><span style={s.spinner} />Procesando…</>
+                                    : values.method === "card" ? <><i className="ti ti-credit-card" style={{ fontSize: 13 }} aria-hidden />Cobrar tarjeta</>
+                                    : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Registrar pago</>}
+                            </button>
+                        </div>
+                    )}
                 </form>
             </div>
         </>
@@ -140,7 +220,7 @@ const validate = (values: Record<string, string>): FormErrors => {
     return e;
 };
 
-const emptyForm = { memberId: "", subscriptionId: "", amount: "", method: "", notes: "" };
+const emptyForm = { memberId: "", subscriptionId: "", amount: "", method: "", notes: "", cardNumber: "", cardExpiry: "", cardCvc: "", cardName: "" };
 
 export default function PaymentsPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -155,15 +235,31 @@ export default function PaymentsPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [planFilter, setPlanFilter] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const limit = 20;
     const { addToast } = useToast();
+
+    const uniquePlans = Array.from(
+        new Map(subscriptions.filter(s => s.plan.name).map(s => [s.plan.id, s.plan])).values()
+    );
+    const hasActiveFilters = search || statusFilter || planFilter || dateFrom || dateTo;
 
     const memberSubscriptions = subscriptions.filter(
         (sub) => sub.member.id === formValues.memberId && sub.status === "active"
     );
 
     const loadPayments = async (targetPage: number) => {
-        const res = await getPayments(targetPage, limit);
+        const filters: Record<string, string> = {};
+        if (search) filters.search = search;
+        if (statusFilter) filters.status = statusFilter;
+        if (planFilter) filters.planId = planFilter;
+        if (dateFrom) filters.dateFrom = dateFrom;
+        if (dateTo) filters.dateTo = dateTo;
+        const res = await getPayments(targetPage, limit, filters);
         setPayments(res.data ?? []);
         setTotal(res.total ?? 0);
         setTotalPages(res.totalPages ?? 1);
@@ -174,8 +270,14 @@ export default function PaymentsPage() {
     useEffect(() => {
         const init = async () => {
             try {
+                const filters: Record<string, string> = {};
+                if (search) filters.search = search;
+                if (statusFilter) filters.status = statusFilter;
+                if (planFilter) filters.planId = planFilter;
+                if (dateFrom) filters.dateFrom = dateFrom;
+                if (dateTo) filters.dateTo = dateTo;
                 const [paymentsRes, membersRes, subsRes] = await Promise.all([
-                    getPayments(page, limit), getMembers(), getSubscriptions(),
+                    getPayments(page, limit, filters), getMembers(), getSubscriptions(),
                 ]);
                 setPayments(paymentsRes.data ?? []);
                 setTotal(paymentsRes.total ?? 0);
@@ -185,7 +287,7 @@ export default function PaymentsPage() {
             } catch { addToast("Error al cargar datos", "error"); } finally { setLoading(false); }
         };
         init();
-    }, [page]);
+    }, [page, search, statusFilter, planFilter, dateFrom, dateTo]);
 
     const openNew = () => { setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -215,6 +317,48 @@ export default function PaymentsPage() {
         } catch { addToast("Error al registrar pago.", "error"); } finally { setSaving(false); }
     };
 
+    const clearFilters = () => {
+        setSearch(""); setStatusFilter(""); setPlanFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
+    };
+
+    const handlePrintTicket = (payment: Payment) => {
+        const sub = subscriptions.find(s => s.id === payment.subscription.id);
+        const planName = payment.subscription.planName || sub?.plan.name || "—";
+        const planPrice = payment.subscription.planPrice ?? sub?.plan.price ?? 0;
+        const ticketHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Ticket de pago</title>
+<style>
+  body { font-family: 'Courier New', monospace; margin: 0; padding: 20px; text-align: center; }
+  .ticket { max-width: 300px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 2px; }
+  .divider { border-top: 1px dashed #333; margin: 10px 0; }
+  .row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; }
+  .label { color: #666; }
+  .thank { margin-top: 14px; font-size: 12px; color: #888; }
+  @media print { body { padding: 0; } }
+</style></head><body>
+<div class="ticket">
+  <h1>🏋️ ZenithGym</h1>
+  <p style="font-size:11px;color:#888;margin:0 0 6px;">Comprobante de pago</p>
+  <div class="divider"></div>
+  <div class="row"><span class="label">Folio</span><span>#${payment.id.slice(-8).toUpperCase()}</span></div>
+  <div class="row"><span class="label">Fecha</span><span>${fmtDateTime(payment.paidAt)}</span></div>
+  <div class="row"><span class="label">Miembro</span><span>${payment.member.fullName}</span></div>
+  <div class="row"><span class="label">Plan</span><span>${planName}</span></div>
+  <div class="row"><span class="label">Vigencia</span><span>${fmtDate(payment.subscription.startDate)} – ${fmtDate(payment.subscription.endDate)}</span></div>
+  <div class="divider"></div>
+  <div class="row"><span class="label">Monto</span><span style="font-weight:700;">$${payment.amount}</span></div>
+  <div class="row"><span class="label">Método</span><span>${methodLabel[payment.method] ?? payment.method}</span></div>
+  <div class="row"><span class="label">Estado</span><span>${statusLabel[payment.status] ?? payment.status}</span></div>
+  <div class="divider"></div>
+  <p class="thank">¡Gracias por tu preferencia!</p>
+</div>
+<script>window.print();window.onafterprint=()=>window.close();setTimeout(()=>window.close(),1000);<\/script>
+</body></html>`;
+        const win = window.open("", "_blank");
+        if (win) { win.document.write(ticketHtml); win.document.close(); }
+    };
+
     return (
         <div style={s.page}>
             <PaymentDrawer open={drawerOpen} saving={saving} values={formValues} errors={errors} touched={touched}
@@ -222,6 +366,29 @@ export default function PaymentsPage() {
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Pagos" action={<GymButton icon="ti-plus" onClick={openNew}>Registrar pago</GymButton>} />
             <div style={s.content}>
+                <div style={s.filterBar}>
+                    <input style={s.filterInput} placeholder="Buscar por miembro…" value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+                    <select style={s.filterSelect} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="paid">Pagado</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="cancelled">Cancelado</option>
+                    </select>
+                    <select style={s.filterSelect} value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}>
+                        <option value="">Todos los planes</option>
+                        {uniquePlans.map((pl) => (
+                            <option key={pl.id} value={pl.id}>{pl.name}</option>
+                        ))}
+                    </select>
+                    <input type="date" style={s.filterInput} value={dateFrom}
+                        onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} title="Desde" />
+                    <input type="date" style={s.filterInput} value={dateTo}
+                        onChange={(e) => { setDateTo(e.target.value); setPage(1); }} title="Hasta" />
+                    {hasActiveFilters && (
+                        <button style={s.clearBtn} onClick={clearFilters}>Limpiar filtros</button>
+                    )}
+                </div>
                 {loading ? (
                     <p style={s.empty}>Cargando pagos…</p>
                 ) : payments.length === 0 ? (
@@ -232,7 +399,7 @@ export default function PaymentsPage() {
                             <thead><tr style={s.thead}>
                                 <th style={s.th}>Miembro</th><th style={s.th}>Monto</th><th style={s.th}>Método</th>
                                 <th style={s.th}>Estado</th><th style={s.th}>Fecha de pago</th>
-                                <th style={s.th}>Fin suscripción</th><th style={s.th}>Notas</th>
+                                <th style={s.th}>Fin suscripción</th><th style={s.th}>Notas</th><th style={s.th}>Acción</th>
                             </tr></thead>
                             <tbody>{payments.map((p) => (
                                 <tr key={p.id} style={s.row}>
@@ -246,6 +413,11 @@ export default function PaymentsPage() {
                                     <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(p.paidAt)}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{fmtDate(p.subscription.endDate)}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{p.notes ?? "—"}</td>
+                                    <td style={s.td}>
+                                        <button style={s.ticketBtn} onClick={() => handlePrintTicket(p)} title="Imprimir ticket">
+                                            <i className="ti ti-receipt" style={{ fontSize: 13 }} aria-hidden /> Ticket
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}</tbody>
                         </table>
@@ -263,6 +435,11 @@ export default function PaymentsPage() {
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
     content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
+    filterBar: { display: "flex", gap: 8, flexWrap: "wrap" as const, alignItems: "center" },
+    filterInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, minWidth: 120 },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" },
+    clearBtn: { background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
+    ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
     toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
     toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
