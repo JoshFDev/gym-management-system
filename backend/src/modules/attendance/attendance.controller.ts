@@ -5,6 +5,7 @@ import {
     getAttendances,
     getAttendanceReport,
     getActiveAttendances,
+    checkoutAll as checkoutAllAttendances,
 } from "./attendance.service";
 
 import { toAttendanceResponse } from "./attendance.dto";
@@ -47,6 +48,7 @@ export const getAll = asyncHandler(
             dateTo: req.query.dateTo as string | undefined,
             search: req.query.search as string | undefined,
             memberId: req.query.memberId as string | undefined,
+            status: req.query.status as string | undefined,
         };
         const result = await getAttendances(page, limit, filters);
 
@@ -78,5 +80,26 @@ export const report = asyncHandler(
         }
         const result = await getAttendanceReport(dateFrom as string, dateTo as string);
         res.status(200).json({ success: true, ...result });
+    }
+);
+
+export const checkoutAll = asyncHandler(
+    async (_req: Request, res: Response) => {
+        const count = await checkoutAllAttendances();
+
+        if (count > 0) {
+            notifyAll({
+                type: "attendance_created",
+                title: "Salidas registradas",
+                message: `${count} salida(s) registrada(s)`,
+                timestamp: new Date().toISOString(),
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `${count} salida(s) registrada(s).`,
+            count,
+        });
     }
 );

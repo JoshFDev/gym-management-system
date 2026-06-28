@@ -192,18 +192,22 @@ export default function ClassesPage() {
         <div style={s.page}>
             <PageHeader title="Clases" subtitle="Horarios y gestión de clases" action={<GymButton icon="ti-plus" onClick={openNew}>Nueva clase</GymButton>} />
 
-            <div style={{ padding: "6px 20px 12px", display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                <select style={s.filterInput} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                    <option value="all">Todas</option>
-                    <option value="active">Activas</option>
-                    <option value="inactive">Inactivas</option>
-                </select>
-                <select style={s.filterInput} value={filterTrainer} onChange={(e) => setFilterTrainer(e.target.value)}>
-                    <option value="">Todos los entrenadores</option>
-                    {trainers.map((t) => (
-                        <option key={t.id} value={`${t.firstName} ${t.lastName}`}>{t.firstName} {t.lastName}</option>
-                    ))}
-                </select>
+            <div className="toolbar-card" style={s.toolbarCard}>
+            <div className="toolbar-wrap" style={s.toolbar}>
+                <div className="filter-group" style={s.filterGroup}>
+                    <select style={s.filterInput} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                        <option value="all">Todas</option>
+                        <option value="active">Activas</option>
+                        <option value="inactive">Inactivas</option>
+                    </select>
+                    <select style={s.filterInput} value={filterTrainer} onChange={(e) => setFilterTrainer(e.target.value)}>
+                        <option value="">Todos los entrenadores</option>
+                        {trainers.map((t) => (
+                            <option key={t.id} value={`${t.firstName} ${t.lastName}`}>{t.firstName} {t.lastName}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
             </div>
 
             <div style={s.content}>
@@ -349,6 +353,26 @@ export default function ClassesPage() {
                 onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
             />
 
+            <style>{`
+                .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                @media (max-width: 768px) {
+                    .table-scroll table { min-width: 550px; }
+                    .drawer-panel { width: 100vw !important; border-left: none !important; }
+                }
+                @media (max-width: 900px) {
+                    .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+                    .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+                    .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+                    .filter-group { width: 100% !important; }
+                }
+                @media (max-width: 600px) {
+                    .filter-group { flex-direction: column !important; }
+                    .filter-group > * { width: 100% !important; }
+                    .export-group { justify-content: stretch !important; }
+                    .export-group > * { flex: 1 !important; }
+                }
+            `}</style>
+
         </div>
     );
 }
@@ -357,22 +381,26 @@ const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%" },
     content: { padding: "8px 20px 16px", display: "flex", flexDirection: "column", gap: 10 },
     empty: { fontSize: 13, color: "#bbb", padding: 40, textAlign: "center" as const },
-    filterInput: { padding: "7px 10px", borderRadius: 6, border: "1px solid #E5E4E2", fontSize: 12, fontFamily: "inherit", outline: "none", background: "#fff", color: "#555" },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 6, padding: "12px 14px" },
+    filterInput: { padding: "9px 12px", borderRadius: 6, border: "1px solid #E5E4E2", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", color: "#555" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 6, padding: "12px 14px", borderTop: "2px solid #D4AF37" },
     className: { fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     classInfo: { fontSize: 11, color: "#888", margin: "2px 0 0" },
     badge: { fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap" as const },
-    btnSmall: { fontSize: 11, padding: "3px 10px", borderRadius: 4, border: "1px solid #E5E4E2", background: "#fff", color: "#555", cursor: "pointer" },
+    btnSmall: { fontSize: 12, padding: "5px 12px", borderRadius: 4, border: "1px solid #E5E4E2", background: "#fff", color: "#555", cursor: "pointer" },
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
     drawer: { background: "#fff", borderRadius: 10, width: 400, maxWidth: "90vw", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 30px rgba(0,0,0,0.12)" },
     drawerHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 20px", borderBottom: "1px solid #E5E4E2" },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     closeBtn: { background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 18, padding: 0 },
-    drawerBody: { padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 },
+    drawerBody: { padding: "16px 20px", overflowY: "auto" },
     label: { fontSize: 11, fontWeight: 500, color: "#555", margin: 0 },
     input: { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #E5E4E2", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box", outline: "none" },
     fieldError: { fontSize: 10, color: "#c0392b", margin: "2px 0 0" },
     drawerFooter: { display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 20px", borderTop: "1px solid #E5E4E2" },
     cancelBtn: { padding: "7px 16px", borderRadius: 6, border: "1px solid #E5E4E2", background: "#fff", color: "#555", fontSize: 12, cursor: "pointer", fontFamily: "inherit" },
     saveBtn: { padding: "7px 16px", borderRadius: 6, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };

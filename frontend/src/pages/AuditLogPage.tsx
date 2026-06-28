@@ -71,26 +71,30 @@ export default function AuditLogPage() {
         <div style={s.page}>
             <PageHeader title="Auditoría" />
             <div style={s.content}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <select
-                        value={entityFilter}
-                        onChange={(e) => setEntityFilter(e.target.value)}
-                        style={{ ...s.filterSelect }}
-                    >
-                        <option value="">Todas las entidades</option>
-                        {uniqueEntities.map((e) => (
-                            <option key={e} value={e}>
-                                {ENTITY_LABEL[e] ?? e}
-                            </option>
-                        ))}
-                    </select>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
+                    <div className="filter-group" style={s.filterGroup}>
+                        <select
+                            value={entityFilter}
+                            onChange={(e) => setEntityFilter(e.target.value)}
+                            style={{ ...s.filterSelect }}
+                        >
+                            <option value="">Todas las entidades</option>
+                            {uniqueEntities.map((e) => (
+                                <option key={e} value={e}>
+                                    {ENTITY_LABEL[e] ?? e}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
                 </div>
                 {loading ? (
                     <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : logs.length === 0 ? (
                     <p style={s.empty}>No hay registros de auditoría.</p>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead>
                                 <tr style={s.thead}>
@@ -140,6 +144,24 @@ export default function AuditLogPage() {
                     </div>
                 )}
             </div>
+            <style>{`
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+        .table-scroll table { min-width: 600px; }
+    }
+    @media (max-width: 900px) {
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+        .filter-group { width: 100% !important; }
+    }
+    @media (max-width: 600px) {
+        .filter-group { flex-direction: column !important; }
+        .filter-group > * { width: 100% !important; }
+        .export-group { justify-content: stretch !important; }
+        .export-group > * { flex: 1 !important; }
+    }
+`}</style>
         </div>
     );
 }
@@ -147,7 +169,7 @@ export default function AuditLogPage() {
 const s: Record<string, React.CSSProperties> = {
     page:    { display: "flex", flexDirection: "column", minHeight: "100%" },
     content: { padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 },
-    card:    { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card:    { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden", borderTop: "2px solid #D4AF37" },
     table:   { width: "100%", borderCollapse: "collapse" },
     thead:   { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th:      { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
@@ -157,7 +179,11 @@ const s: Record<string, React.CSSProperties> = {
     badge:   { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty:   { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     filterSelect: {
-        background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px",
+        background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px",
         fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", maxWidth: 220,
     },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };

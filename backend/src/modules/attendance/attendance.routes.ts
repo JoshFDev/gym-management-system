@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { create,getAll,report,getActive,} from "./attendance.controller";
+import { create,getAll,report,getActive,checkoutAll,} from "./attendance.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
 import { createAttendanceSchema } from "./attendance.validation";
@@ -37,6 +37,13 @@ router.post(
     authorize("admin", "receptionist", "trainer"),
     validate(createAttendanceSchema),
     create
+);
+
+router.post(
+    "/checkout-all",
+    authenticate,
+    authorize("admin", "receptionist", "trainer"),
+    checkoutAll
 );
 
 export default router;

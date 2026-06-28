@@ -31,12 +31,7 @@ interface Member {
     updatedAt: string;
 }
 
-interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string; password?: string }
-
-const statusStyle = (status: string): React.CSSProperties =>
-    status === "active"
-        ? { background: "#F0F7F1", color: "#3a7d44" }
-        : { background: "#F0F0EE", color: "#888" };
+interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string; password?: string; birthDate?: string }
 
 const statusLabel: Record<string, string> = { active: "Activo", inactive: "Inactivo" };
 const genderLabel: Record<string, string> = { male: "Masculino", female: "Femenino", other: "Otro" };
@@ -59,6 +54,15 @@ const validate = (values: Record<string, string>): FormErrors => {
     else if (values.phone.replace(/\D/g, "").length < 10) e.phone = "Formato: XX-XXXX-XXXX";
     if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) e.email = "Correo inválido";
     if (values.password && values.password.length < 6) e.password = "Mínimo 6 caracteres";
+    if (values.birthDate) {
+        const birth = new Date(values.birthDate);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        if (age < 12) e.birthDate = "Debe tener al menos 12 años";
+        else if (age > 100) e.birthDate = "Fecha inválida";
+    }
     return e;
 };
 
@@ -91,7 +95,7 @@ function MemberDrawer({ open, editingId, saving, values, errors, touched, onChan
     return (
         <>
             <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", zIndex: 800 }} onClick={onClose} aria-hidden />
-            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label={editingId ? "Editar miembro" : "Nuevo miembro"}>
+            <div className="drawer-panel" style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label={editingId ? "Editar miembro" : "Nuevo miembro"}>
                 <div style={s.drawerHeader}>
                     <div>
                         <p style={s.drawerTitle}>{editingId ? "Editar miembro" : "Nuevo miembro"}</p>
@@ -101,7 +105,7 @@ function MemberDrawer({ open, editingId, saving, values, errors, touched, onChan
                 </div>
                 <form onSubmit={onSubmit} style={s.drawerBody} noValidate>
                     <p style={s.sectionLabel}><i className="ti ti-user" style={{ fontSize: 12 }} aria-hidden /> Datos personales</p>
-                    <div style={s.formGrid2}>
+                    <div className="drawer-grid-2" style={s.formGrid2}>
                         <Field label="Nombre" required error={errors.firstName} touched={touched.firstName}>
                             <input ref={firstRef} style={{ ...s.input, ...(touched.firstName && errors.firstName ? s.inputError : {}) }}
                                 placeholder="Carlos" value={values.firstName}
@@ -183,7 +187,7 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
     return (
         <>
             <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", zIndex: 800 }} onClick={onClose} aria-hidden />
-            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label="Detalle del miembro">
+            <div className="drawer-panel" style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label="Detalle del miembro">
                 <div style={s.drawerHeader}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ ...sd.avatar, background: member.membershipStatus === "inactive" ? "#FFF4F0" : "#1a1a1a", color: "#fff" }}>
@@ -223,12 +227,42 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
                     </div>
                     <p style={{ ...s.sectionLabel, marginTop: 16 }}><i className="ti ti-qrcode" style={{ fontSize: 12 }} aria-hidden /> Código QR</p>
                     <div style={sd.section}>
-                        <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-                            <QRCodeSVG value={member.id} size={140} level="M" />
+                        <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid #F0F0EE" }}>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{member.firstName} {member.lastName}</p>
+                            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#888" }}>{member.phone}</p>
+                            {member.email && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>{member.email}</p>}
+                            <span style={{ display: "inline-flex", marginTop: 6, padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 500, background: member.membershipStatus === "active" ? "#F0F7F1" : "#F0F0EE", color: member.membershipStatus === "active" ? "#3a7d44" : "#888" }}>
+                                {statusLabel[member.membershipStatus] ?? member.membershipStatus}
+                            </span>
                         </div>
-                        <p style={{ fontSize: 10, color: "#bbb", textAlign: "center", margin: "0 0 12px" }}>
-                            Escanea para registrar entrada
-                        </p>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "14px" }}>
+                            <QRCodeSVG id="member-qr" value={member.id} size={130} level="M" />
+                            <p style={{ fontSize: 10, color: "#bbb", margin: "8px 0 0" }}>
+                                Escanea para registrar entrada
+                            </p>
+                            <button style={{ ...s.btnAction, marginTop: 10, background: "#1a1a1a", color: "#fff", borderColor: "#1a1a1a", gap: 6 }}
+                                onClick={() => {
+                                    const svg = document.getElementById("member-qr");
+                                    if (!svg) return;
+                                    const svgData = new XMLSerializer().serializeToString(svg);
+                                    const canvas = document.createElement("canvas");
+                                    canvas.width = 300; canvas.height = 300;
+                                    const ctx = canvas.getContext("2d");
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        ctx!.fillStyle = "#fff";
+                                        ctx!.fillRect(0, 0, 300, 300);
+                                        ctx!.drawImage(img, 10, 10, 280, 280);
+                                        const link = document.createElement("a");
+                                        link.download = `${member.firstName}_${member.lastName}_QR.png`;
+                                        link.href = canvas.toDataURL("image/png");
+                                        link.click();
+                                    };
+                                    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+                                }}>
+                                <i className="ti ti-download" style={{ fontSize: 13 }} aria-hidden />Descargar QR
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div style={s.drawerFooter}>
@@ -246,7 +280,7 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
 const sd: Record<string, React.CSSProperties> = {
     avatar: { width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, flexShrink: 0 },
     badge: { display: "inline-flex", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, color: "#fff", marginTop: 4 },
-    section: { background: "#FAFAFA", border: "1px solid #F0F0EE", borderRadius: 7, overflow: "hidden", marginTop: 6 },
+    section: { background: "#FAFAFA", border: "1px solid #F0F0EE", borderRadius: 7, marginTop: 6 },
     row: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 12px", borderBottom: "1px solid #F5F5F4", gap: 16 },
     label: { fontSize: 11, color: "#bbb", fontWeight: 500, flexShrink: 0 },
     value: { fontSize: 12, color: "#1a1a1a", textAlign: "right" as const, wordBreak: "break-word" as const },
@@ -392,6 +426,8 @@ export default function MembersPage() {
         } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
     const isDeactivating = confirmTarget?.membershipStatus === "active";
+    const selectedMembers = members.filter((m) => selectedIds.includes(m.id));
+    const allInactive = selectedMembers.length > 0 && selectedMembers.every((m) => m.membershipStatus === "inactive");
 
     return (
         <div style={s.page}>
@@ -401,25 +437,35 @@ export default function MembersPage() {
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}
                 loading={confirmLoading} onConfirm={() => { playConfirmSound(); confirmToggle(); }} onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }} />
 
-            <ConfirmModal open={bulkConfirmOpen} title="Eliminar miembros"
-                body={`¿Eliminar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Solo se eliminarán los que no tengan una suscripción activa.`}
-                confirmLabel="Sí, eliminar" confirmColor="#c0392b"
+            <ConfirmModal open={bulkConfirmOpen}
+                title={allInactive ? "Eliminar miembros" : "Desactivar miembros"}
+                body={allInactive
+                    ? `¿Eliminar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Solo se eliminarán los que no tengan una suscripción activa.`
+                    : `¿Desactivar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Perderán acceso al gimnasio.`}
+                confirmLabel={allInactive ? "Sí, eliminar" : "Sí, desactivar"}
+                confirmColor={allInactive ? "#c0392b" : "#854F0B"}
                 loading={bulkDeleting}
                 onConfirm={async () => {
                     playConfirmSound();
                     setBulkDeleting(true);
-                    let deleted = 0;
+                    let ok = 0;
                     let skipped = 0;
                     for (const id of selectedIds) {
                         try {
-                            await deleteMember(id);
-                            deleted++;
+                            if (allInactive) {
+                                await deleteMember(id);
+                            } else {
+                                await updateMember(id, { membershipStatus: "inactive" });
+                            }
+                            ok++;
                         } catch {
                             skipped++;
                         }
                     }
-                    if (deleted > 0) addToast(`${deleted} miembro${deleted !== 1 ? "s" : ""} eliminado${deleted !== 1 ? "s" : ""}`);
-                    if (skipped > 0) addToast(`${skipped} miembro${skipped !== 1 ? "s" : ""} omitido${skipped !== 1 ? "s" : ""} (tienen suscripción activa)`, "error");
+                    if (ok > 0) addToast(allInactive
+                        ? `${ok} miembro${ok !== 1 ? "s" : ""} eliminado${ok !== 1 ? "s" : ""}`
+                        : `${ok} miembro${ok !== 1 ? "s" : ""} desactivado${ok !== 1 ? "s" : ""}`);
+                    if (skipped > 0) addToast(`${skipped} omitido${skipped !== 1 ? "s" : ""}`, "error");
                     setSelectedIds([]);
                     await loadMembers(page);
                     setBulkDeleting(false);
@@ -432,22 +478,27 @@ export default function MembersPage() {
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Miembros" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo miembro</GymButton>} />
             <div style={s.content}>
-                <div style={s.toolbar}>
-                    <div style={s.searchWrap}>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
+                    <div className="search-wrap" style={s.searchWrap}>
                         <i className="ti ti-search" style={s.searchIcon} aria-hidden />
                         <input style={s.searchInput} placeholder="Buscar por nombre, correo o teléfono…" value={search} onChange={(e) => setSearch(e.target.value)} />
                         {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
                     </div>
-                    <select style={s.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                        <option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Inactivos</option>
-                    </select>
-                    <select style={s.filterSelect} value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-                        <option value="">Todos los géneros</option><option value="male">Masculino</option><option value="female">Femenino</option><option value="other">Otro</option>
-                    </select>
-                    {hasFilters && <button style={s.btnClear} onClick={clearFilters}><i className="ti ti-filter-off" style={{ fontSize: 12 }} aria-hidden /> Limpiar</button>}
-                    <div style={{ flex: 1 }} />
-                    <button style={s.btnExport} onClick={() => exportExcel(members)}><i className="ti ti-table-export" style={{ fontSize: 14 }} aria-hidden />Excel</button>
-                    <button style={s.btnExport} onClick={() => exportPDF(members)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
+                    <div className="filter-group" style={s.filterGroup}>
+                        <select style={s.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                            <option value="">Todos los estados</option><option value="active">Activos</option><option value="inactive">Inactivos</option>
+                        </select>
+                        <select style={s.filterSelect} value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+                            <option value="">Todos los géneros</option><option value="male">Masculino</option><option value="female">Femenino</option><option value="other">Otro</option>
+                        </select>
+                        {hasFilters && <button style={s.btnClear} onClick={clearFilters}><i className="ti ti-filter-off" style={{ fontSize: 12 }} aria-hidden /> Limpiar</button>}
+                    </div>
+                    <div className="export-group" style={s.exportGroup}>
+                        <button style={s.btnExport} onClick={() => exportExcel(members)}><i className="ti ti-table-export" style={{ fontSize: 14 }} aria-hidden />Excel</button>
+                        <button style={s.btnExport} onClick={() => exportPDF(members)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
+                    </div>
+                </div>
                 </div>
                 {!loading && <p style={s.resultCount}>{hasFilters ? `${members.length} de ${total}` : `${total} miembro${total !== 1 ? "s" : ""}`}</p>}
                 {loading ? <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={6} /></div>
@@ -464,9 +515,9 @@ export default function MembersPage() {
                             <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>
                                 {selectedIds.length} seleccionado{selectedIds.length !== 1 ? "s" : ""}
                             </span>
-                            <button style={s.bulkDeleteBtn} onClick={() => setBulkConfirmOpen(true)}>
-                                <i className="ti ti-user-off" style={{ fontSize: 13 }} aria-hidden />
-                                Desactivar seleccionados
+                            <button style={{ ...s.bulkDeleteBtn, background: allInactive ? "#c0392b" : undefined }} onClick={() => setBulkConfirmOpen(true)}>
+                                <i className={`ti ${allInactive ? "ti-trash" : "ti-user-off"}`} style={{ fontSize: 13 }} aria-hidden />
+                                {allInactive ? "Eliminar seleccionados" : "Desactivar seleccionados"}
                             </button>
                             <button style={s.bulkCancelBtn} onClick={() => setSelectedIds([])}>
                                 Cancelar
@@ -474,20 +525,22 @@ export default function MembersPage() {
                         </div>
                     )}
                     <div style={{ ...s.card, padding: 0 }}>
+                        <div className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
-                                <th style={{ ...s.th, width: 36 }}>
+                                <th style={{ ...s.th, width: 36, paddingLeft: 16 }}>
                                     <input type="checkbox" checked={selectedIds.length === members.length && members.length > 0}
                                         onChange={(e) => setSelectedIds(e.target.checked ? members.map((m) => m.id) : [])}
                                         style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
                                 </th>
-                                <th style={s.th}>Miembro</th><th style={s.th}>Correo</th><th style={s.th}>Teléfono</th><th style={s.th}>Género</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
+                                <th style={s.th}>Miembro</th><th style={s.th}>Contacto</th><th style={s.th}>Género</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
                             </tr></thead>
                             <tbody>{members.map((m) => {
                                 const checked = selectedIds.includes(m.id);
+                                const isActive = m.membershipStatus === "active";
                                 return (
-                                <tr key={m.id} style={s.row} className="member-row">
-                                    <td style={{ ...s.td, width: 36 }}>
+                                <tr key={m.id} style={s.row} className="member-row" onClick={() => setViewMember(m)}>
+                                    <td style={{ ...s.td, width: 36, paddingLeft: 16 }} onClick={(e) => e.stopPropagation()}>
                                         <input type="checkbox" checked={checked}
                                             onChange={() => setSelectedIds((prev) =>
                                                 checked ? prev.filter((id) => id !== m.id) : [...prev, m.id]
@@ -495,23 +548,37 @@ export default function MembersPage() {
                                             style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
                                     </td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <div style={{ ...s.avatar, background: m.membershipStatus === "inactive" ? "#FFF4F0" : "#F0F0EE", color: m.membershipStatus === "inactive" ? "#c0392b" : "#666" }}>{initials(m.firstName, m.lastName)}</div>
-                                            <div><p style={s.listName}>{m.firstName} {m.lastName}</p>{m.notes && <p style={s.listSub}>{m.notes}</p>}</div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                                            <div style={{ position: "relative" }}>
+                                                <div style={{ ...s.avatar, background: isActive ? "#F0F7F1" : "#F0F0EE", color: isActive ? "#3a7d44" : "#999" }}>{initials(m.firstName, m.lastName)}</div>
+                                                <span style={{ position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%", border: "2px solid #fff", background: isActive ? "#3a7d44" : "#ccc" }} />
+                                            </div>
+                                            <div>
+                                                <p style={s.listName}>{m.firstName} {m.lastName}</p>
+                                                {m.email && <p style={s.listSub}>{m.email}</p>}
+                                            </div>
                                         </div>
                                     </td>
-                                    <td style={{ ...s.td, ...s.muted }}>{m.email ?? "—"}</td>
-                                    <td style={{ ...s.td, ...s.muted }}>{m.phone}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>{m.phone}{m.email && <><br /><span style={{ fontSize: 11, color: "#bbb" }}>{m.email}</span></>}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{genderLabel[m.gender ?? ""] ?? "—"}</td>
-                                    <td style={s.td}><span style={{ ...s.badge, ...statusStyle(m.membershipStatus) }}>{statusLabel[m.membershipStatus] ?? m.membershipStatus}</span></td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", gap: 6 }}>
-                                            <button style={s.btnAction} onClick={() => setViewMember(m)}>Ver</button>
-                                            <button style={s.btnAction} onClick={() => openEdit(m)}><i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />Editar</button>
-                                            <button style={{ ...s.btnAction, color: m.membershipStatus === "active" ? "#c0392b" : "#3a7d44", borderColor: m.membershipStatus === "active" ? "#fecaca" : "#bbf7d0" }}
-                                                onClick={() => requestToggle(m)}>
-                                                <i className={`ti ${m.membershipStatus === "active" ? "ti-user-off" : "ti-user-check"}`} style={{ fontSize: 13 }} aria-hidden />
-                                                {m.membershipStatus === "active" ? "Desactivar" : "Activar"}
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, background: isActive ? "#F0F7F1" : "#F5F5F4", color: isActive ? "#3a7d44" : "#999" }}>
+                                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: isActive ? "#3a7d44" : "#ccc" }} />
+                                            {statusLabel[m.membershipStatus] ?? m.membershipStatus}
+                                        </span>
+                                    </td>
+                                    <td style={s.td}>
+                                        <div className="actions-group" style={{ display: "flex", gap: 4 }}>
+                                            <button className="btn-icon-action" style={s.btnIconAction} onClick={(e) => { e.stopPropagation(); setViewMember(m); }} title="Ver detalles">
+                                                <i className="ti ti-eye" style={{ fontSize: 14 }} aria-hidden />
+                                            </button>
+                                            <button className="btn-icon-action" style={s.btnIconAction} onClick={(e) => { e.stopPropagation(); openEdit(m); }} title="Editar">
+                                                <i className="ti ti-edit" style={{ fontSize: 14 }} aria-hidden />
+                                            </button>
+                                            <button className="btn-icon-action" style={{ ...s.btnIconAction, color: isActive ? "#c0392b" : "#3a7d44" }}
+                                                onClick={(e) => { e.stopPropagation(); requestToggle(m); }}
+                                                title={isActive ? "Desactivar" : "Activar"}>
+                                                <i className={`ti ${isActive ? "ti-user-off" : "ti-user-check"}`} style={{ fontSize: 14 }} aria-hidden />
                                             </button>
                                         </div>
                                     </td>
@@ -519,6 +586,7 @@ export default function MembersPage() {
                                 );
                             })}</tbody>
                         </table>
+                        </div>
                     </div>
                     {!loading && (
                         <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onChange={setPage} />
@@ -526,7 +594,37 @@ export default function MembersPage() {
                     </>
                 )}
             </div>
-            <style>{`.member-row { transition: background 0.1s ease; } .member-row:hover { background: #FAFAFA; } .member-row:last-child { border-bottom: none !important; } @keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+            <style>{`
+                .member-row { transition: background 0.1s ease; }
+                .member-row:hover { background: #FAFAFA; }
+                .member-row:last-child td { border-bottom: none !important; }
+                .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+                .actions-group { opacity: 0.4; transition: opacity 0.15s; }
+                .member-row:hover .actions-group { opacity: 1; }
+                .btn-icon-action:hover { background: #F0F0EE !important; border-color: #E5E4E2 !important; color: #1a1a1a !important; }
+
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+                @media (max-width: 900px) {
+                    .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+                    .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+                    .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+                    .filter-group { width: 100% !important; }
+                }
+                @media (max-width: 768px) {
+                    .drawer-panel { width: 100vw !important; border-left: none !important; }
+                    .drawer-grid-2 { grid-template-columns: 1fr !important; }
+                }
+                @media (max-width: 600px) {
+                    .table-scroll table { min-width: 620px; }
+                    .filter-group { flex-direction: column !important; }
+                    .filter-group > * { width: 100% !important; }
+                    .export-group { justify-content: stretch !important; }
+                    .export-group > * { flex: 1 !important; }
+                }
+            `}</style>
         </div>
     );
 }
@@ -544,7 +642,7 @@ const s: Record<string, React.CSSProperties> = {
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     drawerSub: { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
-    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
+    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px" },
     drawerFooter: { display: "flex", gap: 8, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
     sectionLabel: { fontSize: 10, fontWeight: 600, color: "#bbb", textTransform: "uppercase" as const, letterSpacing: "0.06em", margin: "4px 0 4px", display: "flex", alignItems: "center", gap: 5 },
     formGrid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
@@ -552,26 +650,29 @@ const s: Record<string, React.CSSProperties> = {
     fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
     input: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, transition: "border-color 0.15s" },
     inputError: { borderColor: "#fecaca" },
-    toolbar: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
-    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 260px" },
-    searchIcon: { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
-    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 12, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 340px" },
+    searchIcon: { position: "absolute", left: 12, fontSize: 15, color: "#bbb", pointerEvents: "none" },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 30px 9px 34px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
     clearBtn: { position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 2, display: "flex", alignItems: "center" },
-    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#555", fontFamily: "inherit", cursor: "pointer", outline: "none" },
-    btnClear: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontFamily: "inherit", cursor: "pointer" },
-    btnExport: { display: "inline-flex", alignItems: "center", gap: 5, background: "#F7F7F6", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#555", fontFamily: "inherit", cursor: "pointer", outline: "none" },
+    btnClear: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+    btnExport: { display: "inline-flex", alignItems: "center", gap: 5, background: "#F7F7F6", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     resultCount: { fontSize: 11, color: "#bbb", margin: 0 },
     btnPrimary: { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnConfirm: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", minWidth: 110 },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden", borderTop: "2px solid #D4AF37" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
-    th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
-    row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    th: { padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
+    row: { borderBottom: "1px solid #F0F0EE", cursor: "pointer" },
+    td: { padding: "10px 12px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     avatar: { width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, flexShrink: 0 },
@@ -579,7 +680,8 @@ const s: Record<string, React.CSSProperties> = {
     listSub: { margin: 0, fontSize: 11, color: "#bbb" },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     emptyState: { display: "flex", flexDirection: "column", alignItems: "center", padding: "52px 0", background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8 },
-    btnAction: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "6px 11px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    btnAction: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 13px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    btnIconAction: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", color: "#888", border: "1px solid transparent", borderRadius: 6, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" },
     bulkBar: {
         display: "flex", alignItems: "center", gap: 10,
         background: "#FFF4F0", border: "1px solid #fecaca", borderRadius: 8,

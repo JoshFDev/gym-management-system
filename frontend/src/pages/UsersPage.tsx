@@ -139,7 +139,7 @@ function UserDetailDrawer({
             />
             <div
                 style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }}
-                role="dialog" aria-modal aria-label="Detalle de usuario"
+                role="dialog" aria-modal aria-label="Detalle de usuario" className="drawer-panel"
             >
                 {/* Header */}
                 <div style={s.drawerHeader}>
@@ -258,7 +258,7 @@ function UserFormDrawer({
             />
             <div
                 style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }}
-                role="dialog" aria-modal aria-label={editingId ? "Editar usuario" : "Nuevo usuario"}
+                role="dialog" aria-modal aria-label={editingId ? "Editar usuario" : "Nuevo usuario"} className="drawer-panel"
             >
                 <div style={s.drawerHeader}>
                     <div>
@@ -633,7 +633,9 @@ export default function UsersPage() {
 
                 {/* Contador + mostrar inactivos */}
                 {!loading && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
                         <p style={s.resultCount}>
                             {filterRole
                                 ? `${filtered.length} ${ROLE_LABEL[filterRole as UserRole].toLowerCase()}${filtered.length !== 1 ? "s" : ""}`
@@ -656,6 +658,8 @@ export default function UsersPage() {
                             Mostrar inactivos
                         </label>
                     </div>
+                </div>
+                </div>
                 )}
 
                 {/* Barra de eliminación masiva */}
@@ -683,7 +687,7 @@ export default function UsersPage() {
                         <p style={{ margin: 0, fontSize: 13, color: "#bbb" }}>Sin usuarios en este rol</p>
                     </div>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead>
                                 <tr style={s.thead}>
@@ -741,9 +745,9 @@ export default function UsersPage() {
                                             </td>
                                             <td style={{ ...s.td, ...s.muted }}>{fmtDate(u.createdAt)}</td>
                                             <td style={s.td}>
-                                                <div style={{ display: "flex", gap: 6 }}>
+                                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                                     <button style={s.btnAction} onClick={() => setViewUser(u)}>
-                                                        Ver
+                                                        Ver detalles
                                                     </button>
                                                     <button style={s.btnAction} onClick={() => openEdit(u)}>
                                                         <i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />
@@ -777,6 +781,25 @@ export default function UsersPage() {
                     to   { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
+            <style>{`
+                .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                @media (max-width: 768px) {
+                    .table-scroll table { min-width: 600px; }
+                    .drawer-panel { width: 100vw !important; border-left: none !important; }
+                }
+                @media (max-width: 900px) {
+                    .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+                    .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+                    .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+                    .filter-group { width: 100% !important; }
+                }
+                @media (max-width: 600px) {
+                    .filter-group { flex-direction: column !important; }
+                    .filter-group > * { width: 100% !important; }
+                    .export-group { justify-content: stretch !important; }
+                    .export-group > * { flex: 1 !important; }
+                }
             `}</style>
         </div>
     );
@@ -830,7 +853,6 @@ const s: Record<string, React.CSSProperties> = {
     drawerSub: { fontSize: 11, color: "#bbb", margin: "3px 0 0" },
     drawerBody: {
         flex: 1, overflowY: "auto", padding: "18px 20px",
-        display: "flex", flexDirection: "column", gap: 12,
     },
     drawerFooter: {
         display: "flex", gap: 8, justifyContent: "flex-end",
@@ -873,12 +895,12 @@ const s: Record<string, React.CSSProperties> = {
     },
 
     // Table
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden", borderTop: "2px solid #D4AF37" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     listName: { margin: 0, fontWeight: 500, fontSize: 13, color: "#1a1a1a" },
@@ -902,10 +924,10 @@ const s: Record<string, React.CSSProperties> = {
         transition: "opacity 0.15s",
     },
     btnAction: {
-        display: "inline-flex", alignItems: "center", gap: 5,
+        display: "inline-flex", alignItems: "center", gap: 6,
         background: "none", color: "#555",
         border: "1px solid #E5E4E2", borderRadius: 6,
-        padding: "6px 11px", fontSize: 12, fontWeight: 500,
+        padding: "8px 13px", fontSize: 13, fontWeight: 500,
         fontFamily: "inherit", cursor: "pointer",
         transition: "background 0.12s, border-color 0.12s, color 0.12s",
     },
@@ -944,6 +966,10 @@ const s: Record<string, React.CSSProperties> = {
         padding: "52px 0", background: "#fff",
         border: "1px solid #E5E4E2", borderRadius: 8,
     },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };
 
 const sd: Record<string, React.CSSProperties> = {

@@ -241,7 +241,7 @@ export default function DashboardPage() {
             <div style={s.content}>
 
                 {/* ── Stats ── */}
-                <div style={s.statsGrid}>
+                <div className="stats-grid" style={s.statsGrid}>
                     <StatCard
                         label="Miembros activos"
                         value={stats.totalMembers}
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* ── Gráficas ── */}
-                <div style={s.row2}>
+                <div className="row-2" style={s.row2}>
                     <div style={s.card}>
                         <p style={s.cardTitle}>Ingresos últimos 7 días</p>
                         <p style={s.cardSub}>Pagos confirmados por día</p>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* ── Listas ── */}
-                <div style={s.row3}>
+                <div className="row-3" style={s.row3}>
 
                     {/* Alertas */}
                     <div style={s.card}>
@@ -431,6 +431,25 @@ export default function DashboardPage() {
 
                 </div>
             </div>
+
+            <style>{`
+                @media (max-width: 1000px) {
+                    .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+                    .row-3 { grid-template-columns: repeat(2, 1fr) !important; }
+                }
+                @media (max-width: 768px) {
+                    .row-2 { grid-template-columns: 1fr !important; }
+                    .row-3 { grid-template-columns: 1fr !important; }
+                }
+                @media (max-width: 600px) {
+                    .stats-grid { grid-template-columns: 1fr !important; }
+                }
+                @media (min-width: 1001px) {
+                    .stats-grid { grid-template-columns: repeat(4, 1fr) !important; }
+                    .row-2 { grid-template-columns: 1.3fr 1fr !important; }
+                    .row-3 { grid-template-columns: repeat(3, 1fr) !important; }
+                }
+            `}</style>
         </div>
     );
 }

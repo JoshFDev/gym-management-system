@@ -35,6 +35,12 @@ const fmtCurrency = (n: number) => `$${n.toLocaleString("es-MX")}`;
 
 const initials = (f: string, l: string) => `${f?.[0] ?? ""}${l?.[0] ?? ""}`.toUpperCase();
 
+const attStatusLabel: Record<string, string> = { checked_in: "Dentro", checked_out: "Completado" };
+const attStatusStyle: Record<string, React.CSSProperties> = {
+    checked_in: { background: "#F0F7F1", color: "#3a7d44" },
+    checked_out: { background: "#F0F0EE", color: "#888" },
+};
+
 const downloadQR = (memberId: string, name: string) => {
     const svg = document.getElementById("profile-qr") as SVGElement | null;
     if (!svg) return;
@@ -109,8 +115,8 @@ export default function MemberProfilePage() {
                         {lastAttendance && (
                             <p style={s.meta}>
                                 Última visita: {fmtDate(lastAttendance.checkInAt)}
-                                <span style={{ ...s.badgeSm, ...(lastAttendance.status === "present" ? { background: "#F0F7F1", color: "#3a7d44" } : { background: "#FFF4F0", color: "#c0392b" }) }}>
-                                    {lastAttendance.status === "present" ? "Presente" : lastAttendance.status}
+                                <span style={{ ...s.badgeSm, ...(attStatusStyle[lastAttendance.status] ?? { background: "#FFF4F0", color: "#c0392b" }) }}>
+                                    {attStatusLabel[lastAttendance.status] ?? lastAttendance.status}
                                 </span>
                             </p>
                         )}
@@ -172,8 +178,8 @@ export default function MemberProfilePage() {
                                                     <td style={s.td}>{d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}</td>
                                                     <td style={{ ...s.td, ...s.muted }}>{d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</td>
                                                     <td style={s.td}>
-                                                        <span style={{ ...s.badgeSm, ...(a.status === "present" ? { background: "#F0F7F1", color: "#3a7d44" } : { background: "#FFF4F0", color: "#c0392b" }) }}>
-                                                            {a.status === "present" ? "Presente" : a.status}
+                                <span style={{ ...s.badgeSm, ...(attStatusStyle[a.status] ?? { background: "#FFF4F0", color: "#c0392b" }) }}>
+                                    {attStatusLabel[a.status] ?? a.status}
                                                         </span>
                                                     </td>
                                                 </tr>

@@ -46,6 +46,7 @@ interface AttendanceFilters {
     dateTo?: string;
     search?: string;
     memberId?: string;
+    status?: string;
 }
 
 const buildMemberQuery = async (filters?: AttendanceFilters): Promise<Record<string, unknown>> => {
@@ -63,6 +64,10 @@ const buildMemberQuery = async (filters?: AttendanceFilters): Promise<Record<str
                 { lastName: { $regex: filters.search, $options: "i" } },
             ],
         });
+    }
+
+    if (filters?.status) {
+        query.status = filters.status;
     }
 
     if (filters?.memberId) {
@@ -144,4 +149,26 @@ export const getAttendanceReport = async (dateFrom: string, dateTo: string) => {
     }
 
     return { labels, data, total: records.length };
+};
+
+export const checkoutAll = async () => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const result = await Attendance.updateMany(
+        {
+            checkInAt: { $gte: todayStart, $lte: todayEnd },
+            checkOutAt: null,
+        },
+        {
+            $set: {
+                checkOutAt: new Date(),
+                status: AttendanceStatus.CHECKED_OUT,
+            },
+        }
+    );
+
+    return result.modifiedCount;
 };

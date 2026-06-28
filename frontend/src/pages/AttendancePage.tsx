@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from "chart.js";
-import { createAttendance, getAttendances, getAttendanceReport, getActiveAttendances } from "../services/attendance.service";
+import { createAttendance, getAttendances, getAttendanceReport, checkoutAllAttendances } from "../services/attendance.service";
 import { getMembers } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -28,12 +28,6 @@ interface Member {
     membershipStatus: string;
 }
 
-interface ActiveMember {
-    id: string;
-    member: { id: string; fullName: string; email?: string; phone?: string };
-    checkInAt: string;
-}
-
 const statusLabel: Record<string, string> = { checked_in: "Dentro", checked_out: "Completado" };
 const statusStyle: Record<string, React.CSSProperties> = {
     checked_in: { background: "#F0F7F1", color: "#3a7d44" },
@@ -45,9 +39,6 @@ const fmtDateTime = (d: string) =>
         day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit",
     });
-
-const fmtTime = (d: string) =>
-    new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 
 const initials = (name: string) =>
     name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -275,7 +266,6 @@ function ReportModal({ open, loading, data, labels, period, total, onPeriod, onC
 export default function AttendancePage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [members, setMembers] = useState<Member[]>([]);
-    const [activeMembers, setActiveMembers] = useState<ActiveMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [memberId, setMemberId] = useState("");
@@ -287,6 +277,7 @@ export default function AttendancePage() {
     const [filterSearch, setFilterSearch] = useState("");
     const [filterGender, setFilterGender] = useState("");
     const [filterDate, setFilterDate] = useState("");
+    const [filterStatus, setFilterStatus] = useState("");
     const debouncedSearch = useDebounce(filterSearch);
     const [reportOpen, setReportOpen] = useState(false);
     const [reportLoading, setReportLoading] = useState(false);
@@ -294,20 +285,22 @@ export default function AttendancePage() {
     const [reportLabels, setReportLabels] = useState<string[]>([]);
     const [reportPeriod, setReportPeriod] = useState("");
     const [reportTotal, setReportTotal] = useState(0);
+    const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
     const limit = 20;
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const cooldownRef = useRef(false);
     const loadRef = useRef<(p: number) => void>(() => {});
-    const loadActiveRef = useRef<() => void>(() => {});
     const pageRef = useRef(page);
     const scannerContainerId = "qr-scanner-container";
 
     const setSearch = (v: string) => { setFilterSearch(v); setPage(1); };
     const setGender = (v: string) => { setFilterGender(v); setPage(1); };
     const setDateFilter = (v: string) => { setFilterDate(v); setPage(1); };
-    const clearFilters = () => { setFilterSearch(""); setFilterGender(""); setFilterDate(""); setPage(1); };
+    const setStatus = (v: string) => { setFilterStatus(v); setPage(1); };
+    const clearFilters = () => { setFilterSearch(""); setFilterGender(""); setFilterDate(""); setFilterStatus(""); setPage(1); };
 
     const activeMembersList = members.filter((m) => m.membershipStatus === "active");
+    const checkedInCount = attendances.filter((a) => a.status === "checked_in").length;
 
     const { addToast } = useToast();
 
@@ -315,6 +308,7 @@ export default function AttendancePage() {
         const f: Record<string, string> = {};
         if (debouncedSearch) f.search = debouncedSearch;
         if (filterGender) f.gender = filterGender;
+        if (filterStatus) f.status = filterStatus;
         if (filterDate === "today") {
             const d = new Date();
             f.dateFrom = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
@@ -331,7 +325,7 @@ export default function AttendancePage() {
             f.dateTo = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
         }
         return f;
-    }, [debouncedSearch, filterGender, filterDate]);
+    }, [debouncedSearch, filterGender, filterDate, filterStatus]);
 
     const loadAttendances = useCallback(async (targetPage: number) => {
         try {
@@ -343,33 +337,23 @@ export default function AttendancePage() {
         } catch { /* handled by caller */ }
     }, [buildFilters]);
 
-    const loadActiveMembers = useCallback(async () => {
-        try {
-            const res = await getActiveAttendances();
-            setActiveMembers(res.data ?? []);
-        } catch { /* ignore */ }
-    }, []);
-
     useEffect(() => { loadRef.current = loadAttendances; }, [loadAttendances]);
-    useEffect(() => { loadActiveRef.current = loadActiveMembers; }, [loadActiveMembers]);
     useEffect(() => { pageRef.current = page; }, [page]);
 
-    useSocketRefresh(["attendance_created"], () => { loadAttendances(page); loadActiveMembers(); });
+    useSocketRefresh(["attendance_created"], () => { loadAttendances(page); });
 
     useEffect(() => {
         const init = async () => {
             try {
                 const f = buildFilters();
-                const [attRes, membersRes, activeRes] = await Promise.all([
+                const [attRes, membersRes] = await Promise.all([
                     getAttendances(page, limit, f),
                     getMembers(),
-                    getActiveAttendances(),
                 ]);
                 setAttendances(attRes.data ?? []);
                 setTotal(attRes.total ?? 0);
                 setTotalPages(attRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
-                setActiveMembers(activeRes.data ?? []);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -440,11 +424,33 @@ export default function AttendancePage() {
             addToast(res.action === "check_out" ? "Salida registrada" : "Entrada registrada");
             clearForm();
             loadAttendances(page);
-            loadActiveMembers();
         } catch {
             addToast("Error al registrar", "error");
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleCheckoutAll = async () => {
+        setCheckoutAllLoading(true);
+        try {
+            const res = await checkoutAllAttendances();
+            addToast(res.count > 0 ? `${res.count} salida(s) registrada(s)` : "Nadie para registrar salida");
+            loadAttendances(page);
+        } catch {
+            addToast("Error al registrar salidas", "error");
+        } finally {
+            setCheckoutAllLoading(false);
+        }
+    };
+
+    const handleCheckoutMember = async (id: string, fullName: string) => {
+        try {
+            await createAttendance(id);
+            addToast(`Salida registrada: ${fullName}`);
+            loadAttendances(page);
+        } catch {
+            addToast("Error al registrar salida", "error");
         }
     };
 
@@ -501,11 +507,6 @@ export default function AttendancePage() {
                 {/* Summary cards */}
                 <div style={s.summaryCard}>
                     <div style={s.summaryItem}>
-                        <p style={s.summaryLabel}>En el gym ahora</p>
-                        <p style={{ ...s.summaryValue, color: activeMembers.length > 0 ? "#3a7d44" : "#bbb" }}>{activeMembers.length}</p>
-                    </div>
-                    <div style={s.summaryDivider} />
-                    <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Entradas hoy</p>
                         <p style={s.summaryValue}>{attendances.length}</p>
                     </div>
@@ -521,27 +522,6 @@ export default function AttendancePage() {
                     </div>
                 </div>
 
-                {/* Active members panel */}
-                {activeMembers.length > 0 && (
-                    <div style={s.activeCard}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={s.liveDot} />
-                            <span style={s.activeTitle}>En el gimnasio ahora</span>
-                            <span style={s.activeBadge}>{activeMembers.length}</span>
-                        </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {activeMembers.map((a) => (
-                                <div key={a.id} style={s.activeChip}>
-                                    {a.member.fullName}
-                                    <span style={{ fontSize: 10, color: "#888", marginLeft: 4 }}>
-                                        ({fmtTime(a.checkInAt)})
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {scanning && (
                     <div style={s.card}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -556,30 +536,45 @@ export default function AttendancePage() {
                 )}
 
                 {/* Filters */}
-                <div style={s.toolbar}>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
                     <div style={s.searchWrap}>
                         <i className="ti ti-search" style={s.searchIcon} aria-hidden />
                         <input style={s.searchInput} placeholder="Buscar miembro…" value={filterSearch}
                             onChange={(e) => setSearch(e.target.value)} />
                         {filterSearch && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
                     </div>
-                    <select style={s.filterSelect} value={filterGender} onChange={(e) => setGender(e.target.value)}>
-                        <option value="">Todos los géneros</option>
-                        <option value="male">Masculino</option>
-                        <option value="female">Femenino</option>
-                        <option value="other">Otro</option>
-                    </select>
-                    <select style={s.filterSelect} value={filterDate} onChange={(e) => setDateFilter(e.target.value)}>
-                        <option value="">Todas las fechas</option>
-                        <option value="today">Hoy</option>
-                        <option value="week">Esta semana</option>
-                        <option value="month">Este mes</option>
-                    </select>
-                    {(filterSearch || filterGender || filterDate) && (
-                        <button style={s.btnClear} onClick={clearFilters}>
-                            <i className="ti ti-filter-off" style={{ fontSize: 12 }} aria-hidden /> Limpiar
+                    <div className="filter-group" style={s.filterGroup}>
+                        <select style={s.filterSelect} value={filterGender} onChange={(e) => setGender(e.target.value)}>
+                            <option value="">Todos los géneros</option>
+                            <option value="male">Masculino</option>
+                            <option value="female">Femenino</option>
+                            <option value="other">Otro</option>
+                        </select>
+                        <select style={s.filterSelect} value={filterStatus} onChange={(e) => setStatus(e.target.value)}>
+                            <option value="">Estado</option>
+                            <option value="checked_in">Dentro</option>
+                            <option value="checked_out">Completado</option>
+                        </select>
+                        <select style={s.filterSelect} value={filterDate} onChange={(e) => setDateFilter(e.target.value)}>
+                            <option value="">Todas las fechas</option>
+                            <option value="today">Hoy</option>
+                            <option value="week">Esta semana</option>
+                            <option value="month">Este mes</option>
+                        </select>
+                        {(filterSearch || filterGender || filterStatus || filterDate) && (
+                            <button style={s.btnClear} onClick={clearFilters}>
+                                <i className="ti ti-filter-off" style={{ fontSize: 12 }} aria-hidden /> Limpiar
+                            </button>
+                        )}
+                    </div>
+                    <div className="export-group" style={s.exportGroup}>
+                        <button style={s.btnDanger} onClick={handleCheckoutAll} disabled={checkoutAllLoading}>
+                            {checkoutAllLoading ? <><span style={{ ...s.spinner, borderTopColor: "#c0392b" }} />Registrando…</>
+                                : <><i className="ti ti-logout" style={{ fontSize: 13 }} aria-hidden /> Todos salieron</>}
                         </button>
-                    )}
+                    </div>
+                </div>
                 </div>
 
                 {/* Attendance table */}
@@ -588,7 +583,7 @@ export default function AttendancePage() {
                 ) : attendances.length === 0 ? (
                     <p style={s.empty}>No hay registros de asistencia.</p>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead>
                                 <tr style={s.thead}>
@@ -600,26 +595,34 @@ export default function AttendancePage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {attendances.map((a) => (
-                                    <tr key={a.id} style={s.row}>
-                                        <td style={s.td}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                                <div style={s.avatar}>{initials(a.member.fullName)}</div>
-                                                <span style={{ fontWeight: 500 }}>{a.member.fullName}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(a.checkInAt)}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>{a.checkOutAt ? fmtDateTime(a.checkOutAt) : "—"}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>
-                                            {a.checkOutAt ? calcDuration(a.checkInAt, a.checkOutAt) : <span style={{ color: "#3a7d44", fontSize: 11 }}>En curso</span>}
-                                        </td>
-                                        <td style={s.td}>
-                                            <span style={{ ...s.badge, ...(statusStyle[a.status] ?? { background: "#F0F0EE", color: "#888" }) }}>
-                                                {statusLabel[a.status] ?? a.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
+                            {attendances.map((a) => {
+                                const isInside = a.status === "checked_in" && !a.checkOutAt;
+                                return (
+                                <tr key={a.id} style={s.row}>
+                                    <td style={s.td}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            <div style={s.avatar}>{initials(a.member.fullName)}</div>
+                                            <span style={{ fontWeight: 500 }}>{a.member.fullName}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ ...s.td, ...s.muted }}>{fmtDateTime(a.checkInAt)}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>{a.checkOutAt ? fmtDateTime(a.checkOutAt) : isInside ? <span style={{ color: "#3a7d44", fontSize: 11, fontWeight: 500 }}>—</span> : "—"}</td>
+                                    <td style={{ ...s.td, ...s.muted }}>
+                                        {a.checkOutAt ? calcDuration(a.checkInAt, a.checkOutAt)
+                                            : isInside
+                                                ? <button style={s.btnCheckoutRow} onClick={() => handleCheckoutMember(a.member.id, a.member.fullName)} title="Registrar salida">
+                                                    <i className="ti ti-logout" style={{ fontSize: 12 }} aria-hidden /> Salida
+                                                </button>
+                                                : <span style={{ color: "#bbb", fontSize: 11 }}>—</span>}
+                                    </td>
+                                    <td style={s.td}>
+                                        <span style={{ ...s.badge, ...(statusStyle[a.status] ?? { background: "#F0F0EE", color: "#888" }) }}>
+                                            {statusLabel[a.status] ?? a.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -628,6 +631,24 @@ export default function AttendancePage() {
                     <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onChange={setPage} />
                 )}
             </div>
+            <style>{`
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+        .table-scroll table { min-width: 600px; }
+    }
+    @media (max-width: 900px) {
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+        .filter-group { width: 100% !important; }
+    }
+    @media (max-width: 600px) {
+        .filter-group { flex-direction: column !important; }
+        .filter-group > * { width: 100% !important; }
+        .export-group { justify-content: stretch !important; }
+        .export-group > * { flex: 1 !important; }
+    }
+`}</style>
         </div>
     );
 }
@@ -647,7 +668,7 @@ const s: Record<string, React.CSSProperties> = {
     thead:          { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th:             { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row:            { borderBottom: "1px solid #F0F0EE" },
-    td:             { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    td:             { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted:          { color: "#888" },
     badge:          { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     avatar:         { width: 28, height: 28, borderRadius: "50%", background: "#F0F0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "#666", flexShrink: 0 },
@@ -664,9 +685,12 @@ const s: Record<string, React.CSSProperties> = {
     input:          { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const },
     timePreview:    { display: "flex", alignItems: "center", gap: 6, marginTop: 10, padding: "8px 12px", background: "#F7F7F6", borderRadius: 6, width: "fit-content" },
     btnIcon:        { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
-    toolbar:        { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
-    filterSelect:   { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#555", fontFamily: "inherit", cursor: "pointer", outline: "none" },
-    btnClear:       { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontFamily: "inherit", cursor: "pointer" },
+    toolbar:        { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard:     { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup:     { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup:     { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    filterSelect:   { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#555", fontFamily: "inherit", cursor: "pointer", outline: "none" },
+    btnClear:       { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#888", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
     btnPrimary:     { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnGhost:       { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     reportPeriods:  { display: "flex", gap: 6, padding: "12px 20px", borderBottom: "1px solid #F0F0EE" },
@@ -678,13 +702,10 @@ const s: Record<string, React.CSSProperties> = {
     reportSub:      { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
     reportBody:     { flex: 1, overflowY: "auto", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 },
     reportFooter:   { display: "flex", gap: 8, justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
-    searchWrap:     { position: "relative", display: "flex", alignItems: "center", flex: "0 0 220px" },
-    searchIcon:     { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
-    searchInput:    { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 12, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
+    searchWrap:     { position: "relative", display: "flex", alignItems: "center", flex: "0 0 340px" },
+    searchIcon:     { position: "absolute", left: 12, fontSize: 15, color: "#bbb", pointerEvents: "none" },
+    searchInput:    { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 30px 9px 34px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
     clearBtn:       { position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 2, display: "flex", alignItems: "center" },
-    activeCard:     { background: "#F0F7F1", border: "1px solid #d1e7d3", borderRadius: 8, padding: "12px 16px" },
-    liveDot:        { width: 8, height: 8, borderRadius: "50%", background: "#3a7d44", display: "inline-block", animation: "pulse 1.5s ease infinite" },
-    activeTitle:    { fontSize: 12, fontWeight: 600, color: "#1a1a1a" },
-    activeBadge:    { fontSize: 10, fontWeight: 600, color: "#3a7d44", background: "#d1e7d3", borderRadius: 10, padding: "1px 7px" },
-    activeChip:     { background: "#fff", border: "1px solid #d1e7d3", borderRadius: 16, padding: "4px 12px", fontSize: 12, color: "#1a1a1a", display: "inline-flex", alignItems: "center" },
+    btnDanger:      { display: "inline-flex", alignItems: "center", gap: 6, background: "#fff", color: "#c0392b", border: "1px solid #fecaca", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.1s" },
+    btnCheckoutRow: { display: "inline-flex", alignItems: "center", gap: 4, background: "none", color: "#c0392b", border: "1px solid #fecaca", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.1s" },
 };

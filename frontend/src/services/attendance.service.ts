@@ -6,6 +6,7 @@ interface AttendanceFilters {
     dateTo?: string;
     search?: string;
     memberId?: string;
+    status?: string;
 }
 
 export const getAttendances = async (page: number = 1, limit: number = 20, filters?: AttendanceFilters) => {
@@ -15,6 +16,7 @@ export const getAttendances = async (page: number = 1, limit: number = 20, filte
     if (filters?.dateTo) params.set("dateTo", filters.dateTo);
     if (filters?.search) params.set("search", filters.search);
     if (filters?.memberId) params.set("memberId", filters.memberId);
+    if (filters?.status) params.set("status", filters.status);
     const response = await api.get(`/attendance?${params.toString()}`);
     return response.data;
 };
@@ -31,5 +33,10 @@ export const getAttendanceReport = async (dateFrom: string, dateTo: string) => {
 
 export const getActiveAttendances = async () => {
     const response = await api.get("/attendance/active");
+    return response.data;
+};
+
+export const checkoutAllAttendances = async () => {
+    const response = await api.post("/attendance/checkout-all");
     return response.data;
 };

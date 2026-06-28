@@ -130,18 +130,22 @@ export default function ExpensesPage() {
             <PageHeader title="Gastos" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo gasto</GymButton>} />
 
             <div style={s.content}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} style={s.filterSelect}>
-                        <option value="">Todas las categorías</option>
-                        {CATEGORY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                    {total > 0 && (
-                        <span style={{ fontSize: 12, color: "#888" }}>
-                            Total: {fmtCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
-                        </span>
-                    )}
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
+                    <div className="filter-group" style={s.filterGroup}>
+                        <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} style={s.filterSelect}>
+                            <option value="">Todas las categorías</option>
+                            {CATEGORY_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                        {total > 0 && (
+                            <span style={{ fontSize: 12, color: "#888" }}>
+                                Total: {fmtCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
+                            </span>
+                        )}
+                    </div>
+                </div>
                 </div>
 
                 {loading ? (
@@ -149,7 +153,7 @@ export default function ExpensesPage() {
                 ) : expenses.length === 0 ? (
                     <p style={s.empty}>No hay gastos registrados.</p>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
                                 <th style={s.th}>Fecha</th>
@@ -169,7 +173,7 @@ export default function ExpensesPage() {
                                     <td style={s.td}>{exp.description}</td>
                                     <td style={{ ...s.td, fontWeight: 600 }}>{fmtCurrency(exp.amount)}</td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", gap: 4 }}>
+                                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                             <button style={s.btnIcon} onClick={() => openEdit(exp)} title="Editar">
                                                 <i className="ti ti-pencil" style={{ fontSize: 13 }} aria-hidden />
                                             </button>
@@ -188,7 +192,7 @@ export default function ExpensesPage() {
 
             {drawerOpen && (
                 <div style={s.overlay} onClick={() => setDrawerOpen(false)}>
-                    <div style={s.drawer} onClick={(e) => e.stopPropagation()}>
+                    <div style={s.drawer} onClick={(e) => e.stopPropagation()} className="drawer-panel">
                         <div style={s.drawerHeader}>
                             <div>
                                 <p style={s.drawerTitle}>{editingId ? "Editar gasto" : "Nuevo gasto"}</p>
@@ -228,6 +232,25 @@ export default function ExpensesPage() {
                     </div>
                 </div>
             )}
+            <style>{`
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+        .table-scroll table { min-width: 550px; }
+        .drawer-panel { width: 100vw !important; border-left: none !important; }
+    }
+    @media (max-width: 900px) {
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+        .filter-group { width: 100% !important; }
+    }
+    @media (max-width: 600px) {
+        .filter-group { flex-direction: column !important; }
+        .filter-group > * { width: 100% !important; }
+        .export-group { justify-content: stretch !important; }
+        .export-group > * { flex: 1 !important; }
+    }
+`}</style>
         </div>
     );
 }
@@ -235,26 +258,30 @@ export default function ExpensesPage() {
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%" },
     content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden", borderTop: "2px solid #D4AF37" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888" },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
-    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", maxWidth: 200 },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", maxWidth: 200 },
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
     drawer: { background: "#fff", borderRadius: 12, width: 420, maxWidth: "90vw", boxShadow: "0 8px 32px rgba(0,0,0,0.14)", display: "flex", flexDirection: "column", maxHeight: "80vh" },
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     drawerSub: { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
-    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
+    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px" },
     drawerFooter: { display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 14, borderTop: "1px solid #F0F0EE" },
     fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555", marginBottom: 4, display: "block" },
     input: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const },
     btnPrimary: { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#555", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };

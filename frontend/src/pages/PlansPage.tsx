@@ -59,7 +59,7 @@ function PlanDrawer({ open, editingId, saving, values, errors, touched, onChange
     return (
         <>
             <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", zIndex: 800 }} onClick={onClose} aria-hidden />
-            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label={editingId ? "Editar plan" : "Nuevo plan"}>
+            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} className="drawer-panel" role="dialog" aria-modal aria-label={editingId ? "Editar plan" : "Nuevo plan"}>
                 <div style={s.drawerHeader}>
                     <div>
                         <p style={s.drawerTitle}>{editingId ? "Editar plan" : "Nuevo plan"}</p>
@@ -201,12 +201,14 @@ export default function PlansPage() {
             <PlanDrawer open={drawerOpen} editingId={editingId} saving={saving} values={formValues} errors={errors} touched={touched}
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Planes" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo plan</GymButton>} />
-            <div style={{ padding: "8px 28px 0" }}>
+            <div className="toolbar-card" style={s.toolbarCard}>
+            <div className="toolbar-wrap" style={s.toolbar}>
                 <div style={s.searchWrap}>
                     <i className="ti ti-search" style={s.searchIcon} aria-hidden />
                     <input style={s.searchInput} placeholder="Buscar plan…" value={search} onChange={(e) => setSearch(e.target.value)} />
                     {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
                 </div>
+            </div>
             </div>
             <div style={s.content}>
                 {error ? (
@@ -222,7 +224,7 @@ export default function PlansPage() {
                 ) : plans.length === 0 ? (
                     <p style={s.empty}>No hay planes registrados.</p>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
                                 <th style={s.th}>Nombre</th><th style={s.th}>Descripción</th><th style={s.th}>Precio</th>
@@ -236,7 +238,7 @@ export default function PlansPage() {
                                     <td style={{ ...s.td, ...s.muted }}>{p.durationDays} días</td>
                                     <td style={s.td}><span style={{ ...s.badge, ...statusStyle(p.status) }}>{statusLabel[p.status] ?? p.status}</span></td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", gap: 6 }}>
+                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                             <button style={s.btnAction} onClick={() => openEdit(p)}><i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />Editar</button>
                                             <button style={{ ...s.btnAction, color: p.status === "active" ? "#c0392b" : "#3a7d44", borderColor: p.status === "active" ? "#fecaca" : "#bbf7d0" }}
                                                 onClick={() => requestToggle(p)}>
@@ -252,6 +254,25 @@ export default function PlansPage() {
                 )}
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+            <style>{`
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+        .table-scroll table { min-width: 550px; }
+        .drawer-panel { width: 100vw !important; border-left: none !important; }
+    }
+    @media (max-width: 900px) {
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+        .filter-group { width: 100% !important; }
+    }
+    @media (max-width: 600px) {
+        .filter-group { flex-direction: column !important; }
+        .filter-group > * { width: 100% !important; }
+        .export-group { justify-content: stretch !important; }
+        .export-group > * { flex: 1 !important; }
+    }
+`}</style>
         </div>
     );
 }
@@ -264,7 +285,7 @@ const s: Record<string, React.CSSProperties> = {
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     drawerSub: { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
-    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
+    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px" },
     drawerFooter: { display: "flex", gap: 8, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
     fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
     fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
@@ -273,19 +294,23 @@ const s: Record<string, React.CSSProperties> = {
     btnPrimary: { display: "inline-flex", alignItems: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
-    btnAction: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "6px 11px", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    btnAction: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 13px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderTop: "2px solid #D4AF37", borderRadius: 8, overflow: "hidden" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
-    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 260px" },
-    searchIcon: { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
-    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 12, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
+    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 340px" },
+    searchIcon: { position: "absolute", left: 12, fontSize: 15, color: "#bbb", pointerEvents: "none" },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 30px 9px 34px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
     clearBtn: { background: "none", border: "none", position: "absolute", right: 8, cursor: "pointer", color: "#bbb", display: "flex", alignItems: "center", padding: 2, borderRadius: 4 },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };

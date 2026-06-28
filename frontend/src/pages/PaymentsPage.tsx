@@ -101,7 +101,7 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
     return (
         <>
             <div style={{ ...s.overlay, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", zIndex: 800 }} onClick={onClose} aria-hidden />
-            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} role="dialog" aria-modal aria-label="Registrar pago">
+            <div style={{ ...s.drawer, transform: open ? "translateX(0)" : "translateX(100%)" }} className="drawer-panel" role="dialog" aria-modal aria-label="Registrar pago">
                 <div style={s.drawerHeader}>
                     <div>
                         <p style={s.drawerTitle}>Registrar pago</p>
@@ -435,31 +435,36 @@ export default function PaymentsPage() {
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Pagos" action={<GymButton icon="ti-plus" onClick={openNew}>Registrar pago</GymButton>} />
             <div style={s.content}>
-                <div style={s.filterBar}>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
                     <input style={s.filterInput} placeholder="Buscar por miembro…" value={search}
                         onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-                    <select style={s.filterSelect} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-                        <option value="">Todos</option>
-                        <option value="paid">Pagado</option>
-                        <option value="pending">Pendiente</option>
-                        <option value="cancelled">Cancelado</option>
-                    </select>
-                    <select style={s.filterSelect} value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}>
-                        <option value="">Todos los planes</option>
-                        {uniquePlans.map((pl) => (
-                            <option key={pl.id} value={pl.id}>{pl.name}</option>
-                        ))}
-                    </select>
-                    <input type="date" style={s.filterInput} value={dateFrom}
-                        onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} title="Desde" />
-                    <input type="date" style={s.filterInput} value={dateTo}
-                        onChange={(e) => { setDateTo(e.target.value); setPage(1); }} title="Hasta" />
-                    {hasActiveFilters && (
-                        <button style={s.clearBtn} onClick={clearFilters}>Limpiar filtros</button>
-                    )}
-                    <span style={{ flex: 1 }} />
-                    <button style={s.exportBtn} onClick={() => exportExcel(payments)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
-                    <button style={s.exportBtn} onClick={() => exportPDF(payments)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
+                    <div className="filter-group" style={s.filterGroup}>
+                        <select style={s.filterSelect} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+                            <option value="">Todos</option>
+                            <option value="paid">Pagado</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="cancelled">Cancelado</option>
+                        </select>
+                        <select style={s.filterSelect} value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}>
+                            <option value="">Todos los planes</option>
+                            {uniquePlans.map((pl) => (
+                                <option key={pl.id} value={pl.id}>{pl.name}</option>
+                            ))}
+                        </select>
+                        <input type="date" style={s.filterInput} value={dateFrom}
+                            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} title="Desde" />
+                        <input type="date" style={s.filterInput} value={dateTo}
+                            onChange={(e) => { setDateTo(e.target.value); setPage(1); }} title="Hasta" />
+                        {hasActiveFilters && (
+                            <button style={s.clearBtn} onClick={clearFilters}>Limpiar filtros</button>
+                        )}
+                    </div>
+                    <div className="export-group" style={s.exportGroup}>
+                        <button style={s.exportBtn} onClick={() => exportExcel(payments)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
+                        <button style={s.exportBtn} onClick={() => exportPDF(payments)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
+                    </div>
+                </div>
                 </div>
                 {error ? (
                     <div style={{ textAlign: "center", padding: 40 }}>
@@ -474,7 +479,7 @@ export default function PaymentsPage() {
                 ) : payments.length === 0 ? (
                     <p style={s.empty}>No hay pagos registrados.</p>
                 ) : (
-                    <div style={{ ...s.card, padding: 0 }}>
+                    <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
                                 <th style={s.th}>Miembro</th><th style={s.th}>Monto</th><th style={s.th}>Método</th>
@@ -494,7 +499,7 @@ export default function PaymentsPage() {
                                     <td style={{ ...s.td, ...s.muted }}>{fmtDate(p.subscription.endDate)}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{p.notes ?? "—"}</td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", gap: 4 }}>
+                                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                             <button style={s.ticketBtn} onClick={() => handlePrintTicket(p)} title="Imprimir ticket">
                                                 <i className="ti ti-receipt" style={{ fontSize: 13 }} aria-hidden />
                                             </button>
@@ -518,6 +523,25 @@ export default function PaymentsPage() {
                 )}
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+            <style>{`
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+        .table-scroll table { min-width: 650px; }
+        .drawer-panel { width: 100vw !important; border-left: none !important; }
+    }
+    @media (max-width: 900px) {
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
+        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
+        .filter-group { width: 100% !important; }
+    }
+    @media (max-width: 600px) {
+        .filter-group { flex-direction: column !important; }
+        .filter-group > * { width: 100% !important; }
+        .export-group { justify-content: stretch !important; }
+        .export-group > * { flex: 1 !important; }
+    }
+`}</style>
         </div>
     );
 }
@@ -526,12 +550,16 @@ const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
     content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
     filterBar: { display: "flex", gap: 8, flexWrap: "wrap" as const, alignItems: "center" },
-    filterInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, minWidth: 120 },
-    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" },
-    clearBtn: { background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
-    exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
-    ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
-    refundBtn: { background: "none", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 500, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
+    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
+    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    filterInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, minWidth: 140 },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" },
+    clearBtn: { background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px", fontSize: 13, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
+    exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px", fontSize: 13, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
+    ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
+    refundBtn: { background: "none", border: "1px solid #fecaca", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 500, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
     toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
     toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
@@ -539,7 +567,7 @@ const s: Record<string, React.CSSProperties> = {
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     drawerTitle: { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     drawerSub: { fontSize: 12, color: "#bbb", margin: "3px 0 0" },
-    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 },
+    drawerBody: { flex: 1, overflowY: "auto", padding: "20px 24px" },
     drawerFooter: { display: "flex", gap: 8, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
     fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
     fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
@@ -549,12 +577,12 @@ const s: Record<string, React.CSSProperties> = {
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, overflow: "hidden" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, borderTop: "2px solid #D4AF37", overflow: "hidden" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
     th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a" },
+    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
     badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
