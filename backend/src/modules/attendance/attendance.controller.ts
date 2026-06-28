@@ -22,13 +22,13 @@ export const create = asyncHandler(
         notifyAll({
             type: "attendance_created",
             title: action === "check_out" ? "Salida registrada" : "Entrada registrada",
-            message: action === "check_out" ? "Check-out registrado" : "Nuevo check-in registrado",
+            message: action === "check_out" ? "Salida registrada" : "Entrada registrada",
             timestamp: new Date().toISOString(),
         });
 
         res.status(201).json({
             success: true,
-            message: action === "check_out" ? "Check-out registered." : "Check-in registered.",
+            message: action === "check_out" ? "Salida registrada." : "Entrada registrada.",
             data: toAttendanceResponse(attendance),
             action,
         });
@@ -73,7 +73,7 @@ export const report = asyncHandler(
     async (req: Request, res: Response) => {
         const { dateFrom, dateTo } = req.query;
         if (!dateFrom || !dateTo) {
-            res.status(400).json({ success: false, message: "dateFrom and dateTo are required" });
+            res.status(400).json({ success: false, message: "dateFrom y dateTo son obligatorios" });
             return;
         }
         const result = await getAttendanceReport(dateFrom as string, dateTo as string);

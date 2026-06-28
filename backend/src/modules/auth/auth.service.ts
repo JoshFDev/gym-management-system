@@ -20,7 +20,7 @@ export const registerUser = async (
     });
 
     if (existingUser) {
-        throw new ConflictError("Email already registered.");
+        throw new ConflictError("El correo ya está registrado.");
     }
 
     const hashedPassword = await bcrypt.hash(
@@ -48,7 +48,7 @@ export const loginUser = async (
         .select("+password");
 
     if (!user) {
-        throw new UnauthorizedError("Invalid email or password.");
+        throw new UnauthorizedError("Correo o contraseña inválidos.");
     }
 
     const passwordMatch = await bcrypt.compare(
@@ -57,7 +57,7 @@ export const loginUser = async (
     );
 
     if (!passwordMatch) {
-        throw new UnauthorizedError("Invalid email or password.");
+        throw new UnauthorizedError("Correo o contraseña inválidos.");
     }
 
     user.lastLogin = new Date();
@@ -130,7 +130,7 @@ export const resetPassword = async (
 
     if (!user) {
         throw new BadRequestError(
-            "Invalid or expired reset token."
+            "Token de restablecimiento inválido o expirado."
         );
     }
 
@@ -153,12 +153,12 @@ export const changePassword = async (
     const user = await User.findById(userId).select("+password");
 
     if (!user) {
-        throw new BadRequestError("User not found.");
+        throw new BadRequestError("Usuario no encontrado.");
     }
 
     const isMatch = await bcrypt.compare(data.currentPassword, user.password);
     if (!isMatch) {
-        throw new UnauthorizedError("Current password is incorrect.");
+        throw new UnauthorizedError("La contraseña actual es incorrecta.");
     }
 
     user.password = await bcrypt.hash(data.newPassword, 12);

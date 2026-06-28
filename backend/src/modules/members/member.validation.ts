@@ -1,36 +1,36 @@
 import { z } from "zod";
 import { MembershipStatus } from "./member.types";
 
-const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "ID inválido.");
 
 export const createMemberSchema = z.object({
     firstName: z
         .string()
         .trim()
-        .min(2, "First name must be at least 2 characters."),
+        .min(2, "El nombre debe tener al menos 2 caracteres."),
 
     lastName: z
         .string()
         .trim()
-        .min(2, "Last name must be at least 2 characters."),
+        .min(2, "El apellido debe tener al menos 2 caracteres."),
 
     email: z
-        .email("Invalid email address.")
+        .email("Correo electrónico inválido.")
         .optional(),
 
     password: z
         .string()
-        .min(6, "Password must be at least 6 characters.")
+        .min(6, "La contraseña debe tener al menos 6 caracteres.")
         .optional(),
 
     phone: z
         .string()
         .trim()
-        .min(10, "Phone must be at least 10 digits."),
+        .min(10, "El teléfono debe tener al menos 10 dígitos."),
 
     birthDate: z
         .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "birthDate must be YYYY-MM-DD.")
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha de nacimiento debe ser YYYY-MM-DD.")
         .optional(),
 
     gender: z

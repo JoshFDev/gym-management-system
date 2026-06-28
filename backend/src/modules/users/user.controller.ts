@@ -50,7 +50,7 @@ export const update = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "User updated successfully.",
+            message: "Usuario actualizado exitosamente.",
             data: {
                 id: user._id.toString(),
                 firstName: user.firstName,
@@ -88,7 +88,7 @@ export const remove = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "User deactivated successfully.",
+            message: "Usuario desactivado exitosamente.",
             data: {
                 id: user._id.toString(),
                 firstName: user.firstName,

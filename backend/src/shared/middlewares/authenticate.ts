@@ -21,7 +21,7 @@ export const authenticate = async (
 
     if (!authHeader) {
         throw new UnauthorizedError(
-            "Access token required."
+            "Token de acceso requerido."
         );
     }
 
@@ -29,7 +29,7 @@ export const authenticate = async (
 
     if (type !== "Bearer" || !token) {
         throw new UnauthorizedError(
-            "Invalid token format."
+            "Formato de token inválido."
         );
     }
 
@@ -38,7 +38,7 @@ export const authenticate = async (
     const user = await User.findById(payload.userId).select("isActive role");
     if (!user || !user.isActive) {
         throw new UnauthorizedError(
-            "User account is inactive."
+            "La cuenta de usuario está inactiva."
         );
     }
 

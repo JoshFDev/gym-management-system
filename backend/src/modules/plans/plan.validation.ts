@@ -5,7 +5,7 @@ export const createPlanSchema = z.object({
     name: z
         .string()
         .trim()
-        .min(2, "Plan name must be at least 2 characters."),
+        .min(2, "El nombre del plan debe tener al menos 2 caracteres."),
 
     description: z
         .string()
@@ -13,11 +13,11 @@ export const createPlanSchema = z.object({
 
     price: z
         .number()
-        .min(0, "Price cannot be negative."),
+        .min(0, "El precio no puede ser negativo."),
 
     durationDays: z
         .number()
-        .min(1, "Duration must be at least 1 day."),
+        .min(1, "La duración debe ser al menos 1 día."),
 
     status: z
         .enum(PlanStatus)

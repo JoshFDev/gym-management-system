@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import { Chart, registerables } from "chart.js";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
@@ -217,7 +218,7 @@ export default function DashboardPage() {
         load();
     }, []);
 
-    if (loading) return <p style={{ padding: 40, color: "#bbb", fontSize: 13 }}>Cargando...</p>;
+    if (loading) return <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>;
     if (!stats) return <p style={{ padding: 40, color: "#bbb", fontSize: 13 }}>Error al cargar datos.</p>;
 
     const days = weekData.map((d) => d.day);
@@ -436,27 +437,27 @@ export default function DashboardPage() {
 
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%" },
-    content: { padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 },
-    statsGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 },
-    statCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 14px" },
+    content: { padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 },
+    statsGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 },
+    statCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "14px 16px", borderTop: `2px solid #D4AF37` },
     statTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
-    statLabel: { fontSize: 10, color: "#bbb", fontWeight: 500, margin: 0 },
-    iconWrap: { width: 26, height: 26, borderRadius: 5, background: "#F7F7F6", display: "flex", alignItems: "center", justifyContent: "center" },
-    statValue: { fontSize: 22, fontWeight: 600, color: "#1a1a1a", letterSpacing: -0.5, margin: 0 },
-    row2: { display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 8 },
-    row3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "13px 14px" },
-    cardTitle: { fontSize: 12, fontWeight: 600, color: "#1a1a1a", margin: 0 },
+    statLabel: { fontSize: 10, color: "#999", fontWeight: 500, margin: 0, textTransform: "uppercase", letterSpacing: 0.5 },
+    iconWrap: { width: 28, height: 28, borderRadius: 6, background: "#F7F7F6", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #EEE" },
+    statValue: { fontSize: 24, fontWeight: 700, color: "#070707", letterSpacing: -0.5, margin: 0 },
+    row2: { display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 },
+    row3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "14px 16px", borderTop: `2px solid #D4AF37` },
+    cardTitle: { fontSize: 13, fontWeight: 600, color: "#070707", margin: 0 },
     cardSub: { fontSize: 10, color: "#bbb", margin: "3px 0 0" },
-    alertRow: { display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 0", borderBottom: "1px solid #F5F5F4" },
-    alertDot: { width: 6, height: 6, borderRadius: "50%", flexShrink: 0, marginTop: 4 },
+    alertRow: { display: "flex", alignItems: "flex-start", gap: 9, padding: "8px 0", borderBottom: "1px solid #F5F5F4" },
+    alertDot: { width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginTop: 4 },
     alertText: { fontSize: 11, color: "#555", lineHeight: 1.5, flex: 1, margin: 0 },
-    listRow: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #F5F5F4" },
-    avatar: { width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, flexShrink: 0 },
+    listRow: { display: "flex", alignItems: "center", gap: 9, padding: "7px 0", borderBottom: "1px solid #F5F5F4" },
+    avatar: { width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, flexShrink: 0 },
     listName: { fontSize: 11, color: "#1a1a1a", fontWeight: 500, margin: 0 },
     listSub: { fontSize: 10, color: "#bbb", margin: 0 },
-    badge: { fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap" },
-    dot: { width: 6, height: 6, borderRadius: "50%", flexShrink: 0 },
+    badge: { fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap" },
+    dot: { width: 7, height: 7, borderRadius: "50%", flexShrink: 0 },
     empty: { fontSize: 11, color: "#bbb", margin: 0 },
-    filterBtn: { fontSize: 10, padding: "3px 8px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 500, transition: "all .15s" },
+    filterBtn: { fontSize: 10, padding: "4px 10px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 500, transition: "all .15s" },
 };

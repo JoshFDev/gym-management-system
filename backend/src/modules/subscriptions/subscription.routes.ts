@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { create, getAll,renew } from "./subscription.controller";
+import { create, getAll, renew, cancel, remove } from "./subscription.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
 import { createSubscriptionSchema } from "./subscription.validation";
@@ -25,11 +25,25 @@ router.get(
     getAll
 );
 
-router.post(
+router.put(
     "/:id/renew",
     authenticate,
     authorize("admin","receptionist"),
     renew
+);
+
+router.patch(
+    "/:id/cancel",
+    authenticate,
+    authorize("admin", "receptionist"),
+    cancel
+);
+
+router.delete(
+    "/:id",
+    authenticate,
+    authorize("admin", "receptionist"),
+    remove
 );
 
 export default router;

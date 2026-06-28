@@ -3,8 +3,9 @@ import { getAuditLogs } from "./auditLog.service";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 
 export const getAll = asyncHandler(
-    async (_req: Request, res: Response) => {
-        const logs = await getAuditLogs();
+    async (req: Request, res: Response) => {
+        const entity = req.query.entity as string | undefined;
+        const logs = await getAuditLogs(entity);
 
         const data = logs.map((log) => ({
             id: log._id.toString(),

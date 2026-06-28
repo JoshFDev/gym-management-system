@@ -41,7 +41,7 @@ export const getExpenses = async (query: {
 
 export const getExpenseById = async (id: string) => {
     const expense = await Expense.findById(id);
-    if (!expense) throw new NotFoundError("Expense not found");
+    if (!expense) throw new NotFoundError("Gasto no encontrado");
     return expense;
 };
 
@@ -49,13 +49,13 @@ export const updateExpense = async (id: string, data: UpdateExpenseInput) => {
     const updateData: Record<string, unknown> = { ...data };
     if (data.date) updateData.date = new Date(data.date);
     const expense = await Expense.findByIdAndUpdate(id, updateData, { returnDocument: "after", runValidators: true });
-    if (!expense) throw new NotFoundError("Expense not found");
+    if (!expense) throw new NotFoundError("Gasto no encontrado");
     return expense;
 };
 
 export const deleteExpense = async (id: string) => {
     const expense = await Expense.findByIdAndDelete(id);
-    if (!expense) throw new NotFoundError("Expense not found");
+    if (!expense) throw new NotFoundError("Gasto no encontrado");
     return expense;
 };
 

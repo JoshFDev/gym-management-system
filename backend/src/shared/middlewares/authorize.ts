@@ -13,13 +13,13 @@ export const authorize =
 
             if (!req.user) {
                 throw new ForbiddenError(
-                    "Access denied."
+                    "Acceso denegado."
                 );
             }
 
             if (!roles.includes(req.user.role)) {
                 throw new ForbiddenError(
-                    "Insufficient permissions."
+                    "Permisos insuficientes."
                 );
             }
 

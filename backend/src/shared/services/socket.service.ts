@@ -19,14 +19,14 @@ export const initSocket = (httpServer: HTTPServer) => {
 
     io.use((socket: Socket, next: (err?: Error) => void) => {
         const token = socket.handshake.auth?.token as string | undefined;
-        if (!token) return next(new Error("Authentication required"));
+        if (!token) return next(new Error("Autenticación requerida"));
 
         try {
             const decoded = verifyToken(token) as SocketUser;
             (socket as any).user = decoded;
             next();
         } catch {
-            next(new Error("Invalid token"));
+            next(new Error("Token inválido"));
         }
     });
 
@@ -43,15 +43,15 @@ export const initSocket = (httpServer: HTTPServer) => {
 };
 
 export const getIO = (): Server => {
-    if (!io) throw new Error("Socket.io not initialized");
+    if (!io) throw new Error("Socket.io no inicializado");
     return io;
 };
 
 type NotificationType =
     | "user_updated" | "user_created" | "user_deactivated"
-    | "member_created" | "member_updated" | "member_deactivated"
+    | "member_created" | "member_updated" | "member_deactivated" | "member_deleted"
     | "plan_created" | "plan_updated" | "plan_deactivated"
-    | "subscription_created" | "subscription_renewed"
+    | "subscription_created" | "subscription_renewed" | "subscription_cancelled" | "payment_refunded"
     | "payment_created"
     | "attendance_created"
     | "class_created" | "class_updated" | "class_deactivated"

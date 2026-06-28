@@ -62,6 +62,11 @@ export const deactivateMember = async (
 
     return response.data;
 };
+export const deleteMember = async (id: string) => {
+    const response = await api.delete(`/members/${id}/force`);
+    return response.data;
+};
+
 export const createMember = async (
     data: CreateMemberData
 ) => {

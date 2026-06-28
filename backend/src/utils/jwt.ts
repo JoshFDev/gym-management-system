@@ -12,7 +12,7 @@ export const generateToken = (
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-        throw new Error("JWT_SECRET is not defined.");
+        throw new Error("JWT_SECRET no está definido.");
     }
 
     const options: SignOptions = {
@@ -30,7 +30,7 @@ export const verifyToken = (
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-        throw new Error("JWT_SECRET is not defined.");
+        throw new Error("JWT_SECRET no está definido.");
     }
 
     return jwt.verify(

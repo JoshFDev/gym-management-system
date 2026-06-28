@@ -8,7 +8,7 @@ import { NotFoundError } from "../../shared/errors/NotFoundError";
 
 export const createAttendance = async (data: CreateAttendanceInput) => {
     const member = await Member.findById(data.memberId);
-    if (!member) throw new NotFoundError("Member not found.");
+    if (!member) throw new NotFoundError("Miembro no encontrado.");
 
     // Find active check-in today (no check-out)
     const todayStart = new Date();

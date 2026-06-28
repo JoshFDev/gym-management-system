@@ -21,7 +21,7 @@ export const create = asyncHandler(async (req: AuthRequest, res: Response) => {
     await logAudit({ action: "CREATE", entity: "ClassSchedule", entityId: cls._id.toString(), userId: req.user!.userId, userRole: req.user!.role });
     notifyAll({ type: "class_created", title: "Clase creada", message: `${cls.name} fue creada por ${req.user!.role}`, timestamp: new Date().toISOString() });
 
-    res.status(201).json({ success: true, message: "Class created successfully.", data: toClassScheduleResponse(cls) });
+    res.status(201).json({ success: true, message: "Clase creada exitosamente.", data: toClassScheduleResponse(cls) });
 });
 
 export const getAll = asyncHandler(async (_req: Request, res: Response) => {
@@ -45,7 +45,7 @@ export const update = asyncHandler(async (req: AuthRequest, res: Response) => {
     await logAudit({ action: "UPDATE", entity: "ClassSchedule", entityId: cls._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: req.body });
     notifyAll({ type: "class_updated", title: "Clase actualizada", message: `${cls.name} fue modificada por ${req.user!.role}`, timestamp: new Date().toISOString() });
 
-    res.status(200).json({ success: true, message: "Class updated successfully.", data: toClassScheduleResponse(cls) });
+    res.status(200).json({ success: true, message: "Clase actualizada exitosamente.", data: toClassScheduleResponse(cls) });
 });
 
 export const deactivate = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -54,7 +54,7 @@ export const deactivate = asyncHandler(async (req: AuthRequest, res: Response) =
     await logAudit({ action: "DELETE", entity: "ClassSchedule", entityId: cls._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: { status: "inactive" } });
     notifyAll({ type: "class_deactivated", title: "Clase desactivada", message: `${cls.name} fue desactivada por ${req.user!.role}`, timestamp: new Date().toISOString() });
 
-    res.status(200).json({ success: true, message: "Class deactivated successfully.", data: toClassScheduleResponse(cls) });
+    res.status(200).json({ success: true, message: "Clase desactivada exitosamente.", data: toClassScheduleResponse(cls) });
 });
 
 export const activate = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -63,7 +63,7 @@ export const activate = asyncHandler(async (req: AuthRequest, res: Response) => 
     await logAudit({ action: "UPDATE", entity: "ClassSchedule", entityId: cls._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: { status: "active" } });
     notifyAll({ type: "class_updated", title: "Clase reactivada", message: `${cls.name} fue reactivada por ${req.user!.role}`, timestamp: new Date().toISOString() });
 
-    res.status(200).json({ success: true, message: "Class reactivated successfully.", data: toClassScheduleResponse(cls) });
+    res.status(200).json({ success: true, message: "Clase reactivada exitosamente.", data: toClassScheduleResponse(cls) });
 });
 
 export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -72,5 +72,5 @@ export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
     await logAudit({ action: "DELETE", entity: "ClassSchedule", entityId: cls._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: { deleted: true } });
     notifyAll({ type: "class_deactivated", title: "Clase eliminada", message: `${cls.name} fue eliminada permanentemente por ${req.user!.role}`, timestamp: new Date().toISOString() });
 
-    res.status(200).json({ success: true, message: "Class deleted permanently." });
+    res.status(200).json({ success: true, message: "Clase eliminada permanentemente." });
 });

@@ -4,6 +4,7 @@ import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip }
 import { createAttendance, getAttendances, getAttendanceReport, getActiveAttendances } from "../services/attendance.service";
 import { getMembers } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -583,7 +584,7 @@ export default function AttendancePage() {
 
                 {/* Attendance table */}
                 {loading ? (
-                    <p style={s.empty}>Cargando asistencias…</p>
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : attendances.length === 0 ? (
                     <p style={s.empty}>No hay registros de asistencia.</p>
                 ) : (

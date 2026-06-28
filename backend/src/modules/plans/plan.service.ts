@@ -19,7 +19,7 @@ export const createPlan = async (
 
     if (existingPlan) {
         throw new ConflictError(
-            "Plan already exists."
+            "El plan ya existe."
         );
     }
 
@@ -46,7 +46,7 @@ export const getPlanById = async (
 
     if (!plan) {
         throw new NotFoundError(
-            "Plan not found."
+            "Plan no encontrado."
         );
     }
 
@@ -69,7 +69,7 @@ export const updatePlan = async (
 
     if (!plan) {
         throw new NotFoundError(
-            "Plan not found."
+            "Plan no encontrado."
         );
     }
 
@@ -93,7 +93,7 @@ export const deactivatePlan = async (
 
     if (!plan) {
         throw new NotFoundError(
-            "Plan not found."
+            "Plan no encontrado."
         );
     }
 

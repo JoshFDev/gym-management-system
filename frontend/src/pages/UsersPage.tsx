@@ -13,8 +13,9 @@ import { useEffect, useState, useMemo } from "react";
 import { registerRequest, forgotPasswordRequest } from "../services/auth.service";
 import { getUsers, updateUser, deleteUser } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
-import type { UserRole } from "../hooks/useAuth";
+import { useAuth, type UserRole } from "../hooks/useAuth";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
@@ -380,6 +381,8 @@ export default function UsersPage() {
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
+    const isSelf = (u: User) => u.id === currentUser?.id;
+
     // Filtro rápido por rol
     const [filterRole, setFilterRole] = useState("");
     const [showInactive, setShowInactive] = useState(false);
@@ -389,6 +392,7 @@ export default function UsersPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
+    const { user: currentUser } = useAuth();
     const { addToast } = useToast();
     useUnsavedChanges(formOpen);
 
@@ -672,7 +676,7 @@ export default function UsersPage() {
 
                 {/* Tabla */}
                 {loading ? (
-                    <p style={s.empty}>Cargando usuarios…</p>
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : filtered.length === 0 ? (
                     <div style={s.emptyState}>
                         <i className="ti ti-users" style={{ fontSize: 30, color: "#D0D0CE", marginBottom: 10 }} aria-hidden />
@@ -684,8 +688,8 @@ export default function UsersPage() {
                             <thead>
                                 <tr style={s.thead}>
                                     <th style={{ ...s.th, width: 36 }}>
-                                        <input type="checkbox" checked={selectedIds.length === filtered.length && filtered.length > 0}
-                                            onChange={(e) => setSelectedIds(e.target.checked ? filtered.map((u) => u.id) : [])}
+                                        <input type="checkbox" checked={selectedIds.length === filtered.filter((u) => u.id !== currentUser?.id).length && filtered.length > 0}
+                                            onChange={(e) => setSelectedIds(e.target.checked ? filtered.filter((u) => u.id !== currentUser?.id).map((u) => u.id) : [])}
                                             style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
                                     </th>
                                     <th style={s.th}>Usuario</th>
@@ -705,17 +709,19 @@ export default function UsersPage() {
                                         <tr key={u.id} style={{ ...s.row, opacity: isActive ? 1 : 0.6 }} className="user-row">
                                             <td style={{ ...s.td, width: 36 }}>
                                                 <input type="checkbox" checked={checked}
+                                                    disabled={u.id === currentUser?.id}
                                                     onChange={() => setSelectedIds((prev) =>
                                                         checked ? prev.filter((id) => id !== u.id) : [...prev, u.id]
                                                     )}
-                                                    style={{ accentColor: "#1a1a1a", cursor: "pointer", margin: 0 }} />
+                                                    style={{ accentColor: "#1a1a1a", cursor: u.id === currentUser?.id ? "not-allowed" : "pointer", margin: 0, opacity: u.id === currentUser?.id ? 0.3 : 1 }} />
                                             </td>
                                             <td style={s.td}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: u.id === currentUser?.id ? 0.5 : 1 }}>
                                                     <div style={{ ...sd.avatar, background: rc.bg, color: rc.color }}>
                                                         {initials(u.firstName, u.lastName)}
                                                     </div>
                                                     <p style={s.listName}>{u.firstName} {u.lastName}</p>
+                                                    {u.id === currentUser?.id && <span style={{ fontSize: 10, color: "#bbb", fontWeight: 500 }}>(tú)</span>}
                                                 </div>
                                             </td>
                                             <td style={{ ...s.td, ...s.muted }}>{u.email}</td>
@@ -744,8 +750,9 @@ export default function UsersPage() {
                                                         Editar
                                                     </button>
                                                     <button
-                                                        style={{ ...s.btnAction, color: isActive ? "#854F0B" : "#c0392b", borderColor: isActive ? "#FDE68A" : "#fecaca" }}
-                                                        onClick={() => setDeleteTarget(u)}
+                                                        style={{ ...s.btnAction, color: isActive ? "#854F0B" : "#c0392b", borderColor: isActive ? "#FDE68A" : "#fecaca", opacity: isSelf(u) ? 0.4 : 1, cursor: isSelf(u) ? "not-allowed" : "pointer" }}
+                                                        onClick={() => !isSelf(u) && setDeleteTarget(u)}
+                                                        disabled={isSelf(u)}
                                                     >
                                                         <i className={`ti ${isActive ? "ti-user-x" : "ti-trash"}`} style={{ fontSize: 13 }} aria-hidden />
                                                         {isActive ? "Desactivar" : "Eliminar"}

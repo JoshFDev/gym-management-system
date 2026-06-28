@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
-import { createPayment, getPayments, updatePayment } from "./payment.service";
+import { createPayment, getPayments, updatePayment, refundPayment } from "./payment.service";
 import { toPaymentResponse } from "./payment.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
@@ -42,7 +42,7 @@ export const create = asyncHandler(
 
         res.status(201).json({
             success: true,
-            message: "Payment registered successfully.",
+            message: "Pago registrado exitosamente.",
             data: toPaymentResponse(payment),
         });
     }
@@ -85,7 +85,35 @@ export const update = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Payment updated successfully.",
+            message: "Pago actualizado exitosamente.",
+            data: toPaymentResponse(payment),
+        });
+    }
+);
+
+export const refund = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const payment = await refundPayment(req.params.id as string);
+
+        logAudit({
+            action: "UPDATE",
+            entity: "Payment",
+            entityId: payment._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { status: "refunded" },
+        }).catch(() => {});
+
+        notifyAll({
+            type: "payment_refunded",
+            title: "Pago reembolsado",
+            message: `Pago de $${payment.amount} reembolsado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Pago reembolsado exitosamente.",
             data: toPaymentResponse(payment),
         });
     }

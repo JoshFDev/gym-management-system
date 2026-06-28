@@ -39,3 +39,8 @@ export const updatePayment = async (id: string, data: UpdatePaymentData) => {
     const response = await api.put(`/payments/${id}`, data);
     return response.data;
 };
+
+export const refundPayment = async (id: string) => {
+    const response = await api.post(`/payments/${id}/refund`);
+    return response.data;
+};

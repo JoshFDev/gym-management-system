@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getAuditLogs } from "../services/audit-log.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 
 interface AuditLog {
     id: string;
@@ -13,10 +14,20 @@ interface AuditLog {
     createdAt: string;
 }
 
+const ENTITY_LABEL: Record<string, string> = {
+    Member: "Miembro",
+    Subscription: "Suscripción",
+    Plan: "Plan",
+    Payment: "Pago",
+    Attendance: "Asistencia",
+    User: "Usuario",
+    ClassSchedule: "Clase",
+};
+
 const ACTION_LABEL: Record<string, string> = {
     CREATE: "Creó",
     UPDATE: "Actualizó",
-    DELETE: "Desactivó",
+    DELETE: "Eliminó",
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -37,11 +48,13 @@ const fmtDate = (d: string) =>
 export default function AuditLogPage() {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
+    const [entityFilter, setEntityFilter] = useState("");
 
     useEffect(() => {
         const load = async () => {
+            setLoading(true);
             try {
-                const res = await getAuditLogs();
+                const res = await getAuditLogs(entityFilter || undefined);
                 setLogs(res.data ?? []);
             } catch {
                 setLogs([]);
@@ -50,14 +63,30 @@ export default function AuditLogPage() {
             }
         };
         load();
-    }, []);
+    }, [entityFilter]);
+
+    const uniqueEntities = [...new Set(logs.map((l) => l.entity))];
 
     return (
         <div style={s.page}>
             <PageHeader title="Auditoría" />
             <div style={s.content}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <select
+                        value={entityFilter}
+                        onChange={(e) => setEntityFilter(e.target.value)}
+                        style={{ ...s.filterSelect }}
+                    >
+                        <option value="">Todas las entidades</option>
+                        {uniqueEntities.map((e) => (
+                            <option key={e} value={e}>
+                                {ENTITY_LABEL[e] ?? e}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 {loading ? (
-                    <p style={s.empty}>Cargando registros...</p>
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : logs.length === 0 ? (
                     <p style={s.empty}>No hay registros de auditoría.</p>
                 ) : (
@@ -86,7 +115,9 @@ export default function AuditLogPage() {
                                                 {ACTION_LABEL[log.action] ?? log.action}
                                             </span>
                                         </td>
-                                        <td style={s.td}>{log.entity}</td>
+                                        <td style={s.td}>
+                                            {ENTITY_LABEL[log.entity] ?? log.entity}
+                                        </td>
                                         <td style={s.td}>
                                             {log.user ? (
                                                 <div>
@@ -125,4 +156,8 @@ const s: Record<string, React.CSSProperties> = {
     muted:   { color: "#888" },
     badge:   { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty:   { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
+    filterSelect: {
+        background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px",
+        fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", maxWidth: 220,
+    },
 };

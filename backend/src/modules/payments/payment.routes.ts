@@ -4,6 +4,7 @@ import {
     create,
     getAll,
     update,
+    refund,
 } from "./payment.controller";
 
 import {
@@ -39,6 +40,13 @@ router.put(
     authorize("admin","receptionist"),
     validate(updatePaymentSchema),
     update
+);
+
+router.post(
+    "/:id/refund",
+    authenticate,
+    authorize("admin"),
+    refund
 );
 
 export default router;

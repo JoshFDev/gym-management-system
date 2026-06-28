@@ -29,7 +29,7 @@ export const updateUser = async (
     const user = await User.findById(id);
 
     if (!user) {
-        throw new NotFoundError("User not found.");
+        throw new NotFoundError("Usuario no encontrado.");
     }
 
     if (data.firstName !== undefined) {
@@ -74,7 +74,7 @@ export const deleteUser = async (
     const user = await User.findById(id);
 
     if (!user) {
-        throw new NotFoundError("User not found.");
+        throw new NotFoundError("Usuario no encontrado.");
     }
 
     user.isActive = false;

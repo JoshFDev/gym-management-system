@@ -1,3 +1,5 @@
+const GOLD = "#D4AF37";
+
 interface PageHeaderProps {
     title: string;
     subtitle?: string;
@@ -20,7 +22,8 @@ export default function PageHeader({
                 <p style={s.date}>{today}</p>
                 {subtitle && (
                     <p style={s.subtitle}>{subtitle}</p>
-                )}          </div>
+                )}
+            </div>
             {action}
         </div>
     );
@@ -28,26 +31,28 @@ export default function PageHeader({
 
 const s: Record<string, React.CSSProperties> = {
     bar: {
-        padding: "18px 28px",
+        padding: "22px 28px 18px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        background: "#ffffff",
-        borderBottom: "1px solid #E5E4E2",
+        background: "#070707",
+        borderBottom: `1px solid ${GOLD}20`,
     },
     title: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: 600,
-        color: "#1a1a1a",
+        color: "#fff",
+        letterSpacing: -0.2,
     },
     date: {
         fontSize: 12,
-        color: "#bbbbbb",
+        color: "rgba(255,255,255,0.35)",
         marginTop: 2,
         textTransform: "capitalize",
-    }, subtitle: {
+    },
+    subtitle: {
         fontSize: 12,
-        color: "#bbbbbb",
+        color: `${GOLD}99`,
         marginTop: 3,
     },
 };

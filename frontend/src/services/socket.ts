@@ -7,8 +7,8 @@ export interface NotificationPayload {
         | "user_updated" | "user_created" | "user_deactivated"
         | "member_created" | "member_updated" | "member_deactivated"
         | "plan_created" | "plan_updated" | "plan_deactivated"
-        | "subscription_created" | "subscription_renewed"
-        | "payment_created"
+        | "subscription_created" | "subscription_renewed" | "subscription_cancelled"
+        | "payment_created" | "payment_refunded"
         | "attendance_created"
         | "info";
     title: string;

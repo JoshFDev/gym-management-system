@@ -9,6 +9,7 @@ import {
 } from "./payment.validation";
 
 import { NotFoundError } from "../../shared/errors/NotFoundError";
+import { BadRequestError } from "../../shared/errors/BadRequestError";
 
 export const createPayment = async (
     data: CreatePaymentInput
@@ -20,7 +21,7 @@ export const createPayment = async (
 
     if (!member) {
         throw new NotFoundError(
-            "Member not found."
+            "Miembro no encontrado."
         );
     }
 
@@ -31,7 +32,7 @@ export const createPayment = async (
 
     if (!subscription) {
         throw new NotFoundError(
-            "Subscription not found."
+            "Suscripción no encontrada."
         );
     }
 
@@ -122,9 +123,27 @@ export const updatePayment = async (
 
     if (!payment) {
         throw new NotFoundError(
-            "Payment not found."
+            "Pago no encontrado."
         );
     }
+
+    return payment;
+};
+
+export const refundPayment = async (id: string) => {
+    const payment = await Payment.findById(id);
+    if (!payment) {
+        throw new NotFoundError("Pago no encontrado.");
+    }
+    if (payment.status !== "paid") {
+        throw new BadRequestError("Solo se pueden reembolsar pagos con estado 'pagado'.");
+    }
+
+    payment.status = "refunded" as any;
+    payment.notes = payment.notes
+        ? `${payment.notes} [Reembolsado ${new Date().toLocaleDateString("es-MX")}]`
+        : `Reembolsado ${new Date().toLocaleDateString("es-MX")}`;
+    await payment.save();
 
     return payment;
 };

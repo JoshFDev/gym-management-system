@@ -4,10 +4,11 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QRCodeSVG } from "qrcode.react";
-import { createMember, getMembers, updateMember } from "../services/member.service";
+import { createMember, getMembers, updateMember, deleteMember } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
@@ -378,13 +379,17 @@ export default function MembersPage() {
     const requestToggle = (m: Member) => { setConfirmTarget(m); setConfirmOpen(true); };
     const confirmToggle = async () => {
         if (!confirmTarget) return;
+        const newStatus = confirmTarget.membershipStatus === "active" ? "inactive" : "active";
+        const prev = members;
+        setMembers((current) => current.map((m) => m.id === confirmTarget.id ? { ...m, membershipStatus: newStatus } : m));
         setConfirmLoading(true);
         try {
-            const newStatus = confirmTarget.membershipStatus === "active" ? "inactive" : "active";
             await updateMember(confirmTarget.id, { membershipStatus: newStatus });
             addToast(newStatus === "active" ? `${confirmTarget.firstName} activado` : `${confirmTarget.firstName} desactivado`);
-            await loadMembers(page);
-        } catch { addToast("No se pudo cambiar el estado.", "error"); } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
+        } catch {
+            setMembers(prev);
+            addToast("No se pudo cambiar el estado.", "error");
+        } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
     const isDeactivating = confirmTarget?.membershipStatus === "active";
 
@@ -396,24 +401,29 @@ export default function MembersPage() {
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}
                 loading={confirmLoading} onConfirm={() => { playConfirmSound(); confirmToggle(); }} onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }} />
 
-            <ConfirmModal open={bulkConfirmOpen} title="Desactivar miembros"
-                body={`¿Desactivar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Perderán acceso al gimnasio.`}
-                confirmLabel="Sí, desactivar todos" confirmColor="#c0392b"
+            <ConfirmModal open={bulkConfirmOpen} title="Eliminar miembros"
+                body={`¿Eliminar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Solo se eliminarán los que no tengan una suscripción activa.`}
+                confirmLabel="Sí, eliminar" confirmColor="#c0392b"
                 loading={bulkDeleting}
                 onConfirm={async () => {
                     playConfirmSound();
                     setBulkDeleting(true);
-                    try {
-                        await Promise.all(selectedIds.map((id) => updateMember(id, { membershipStatus: "inactive" })));
-                        addToast(`${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} desactivado${selectedIds.length !== 1 ? "s" : ""}`);
-                        setSelectedIds([]);
-                        await loadMembers(page);
-                    } catch {
-                        addToast("Error al desactivar miembros.", "error");
-                    } finally {
-                        setBulkDeleting(false);
-                        setBulkConfirmOpen(false);
+                    let deleted = 0;
+                    let skipped = 0;
+                    for (const id of selectedIds) {
+                        try {
+                            await deleteMember(id);
+                            deleted++;
+                        } catch {
+                            skipped++;
+                        }
                     }
+                    if (deleted > 0) addToast(`${deleted} miembro${deleted !== 1 ? "s" : ""} eliminado${deleted !== 1 ? "s" : ""}`);
+                    if (skipped > 0) addToast(`${skipped} miembro${skipped !== 1 ? "s" : ""} omitido${skipped !== 1 ? "s" : ""} (tienen suscripción activa)`, "error");
+                    setSelectedIds([]);
+                    await loadMembers(page);
+                    setBulkDeleting(false);
+                    setBulkConfirmOpen(false);
                 }}
                 onCancel={() => setBulkConfirmOpen(false)} />
             <MemberDetailDrawer member={viewMember} open={!!viewMember} onClose={() => setViewMember(null)}
@@ -440,7 +450,7 @@ export default function MembersPage() {
                     <button style={s.btnExport} onClick={() => exportPDF(members)}><i className="ti ti-file-type-pdf" style={{ fontSize: 14 }} aria-hidden />PDF</button>
                 </div>
                 {!loading && <p style={s.resultCount}>{hasFilters ? `${members.length} de ${total}` : `${total} miembro${total !== 1 ? "s" : ""}`}</p>}
-                {loading ? <p style={s.empty}>Cargando miembros…</p>
+                {loading ? <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={6} /></div>
                 : members.length === 0 ? (
                     <div style={s.emptyState}>
                         <i className="ti ti-users-group" style={{ fontSize: 32, color: "#D0D0CE", marginBottom: 10 }} aria-hidden />
@@ -448,6 +458,7 @@ export default function MembersPage() {
                         {hasFilters && <button style={{ ...s.btnClear, marginTop: 12 }} onClick={clearFilters}>Quitar filtros</button>}
                     </div>
                 ) : (
+                    <>
                     {selectedIds.length > 0 && (
                         <div style={s.bulkBar}>
                             <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>

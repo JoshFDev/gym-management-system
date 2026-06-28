@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
 import { toMemberResponse } from "./member.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
-import { createMember, getMembers, getMemberById, updateMember, deactivateMember } from "./member.service";
+import { createMember, getMembers, getMemberById, updateMember, deactivateMember, deleteMember } from "./member.service";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
 
@@ -27,7 +27,7 @@ export const create = asyncHandler(
 
         res.status(201).json({
             success: true,
-            message: "Member created successfully.",
+            message: "Miembro creado exitosamente.",
             data: toMemberResponse(member),
         });
     }
@@ -86,7 +86,7 @@ export const update = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Member updated successfully.",
+            message: "Miembro actualizado exitosamente.",
             data: toMemberResponse(member),
         });
     }
@@ -114,8 +114,34 @@ export const deactivate = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Member deactivated successfully.",
+            message: "Miembro desactivado exitosamente.",
             data: toMemberResponse(member),
+        });
+    }
+);
+
+export const remove = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const member = await deleteMember(req.params.id as string);
+
+        logAudit({
+            action: "DELETE",
+            entity: "Member",
+            entityId: member._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+        }).catch(() => {});
+
+        notifyAll({
+            type: "member_deleted",
+            title: "Miembro eliminado",
+            message: `${member.firstName} ${member.lastName} fue eliminado del sistema por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Miembro eliminado exitosamente.",
         });
     }
 );

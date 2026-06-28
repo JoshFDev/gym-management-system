@@ -33,7 +33,7 @@ export const create = asyncHandler(
 
         res.status(201).json({
             success: true,
-            message: "Plan created successfully.",
+            message: "Plan creado exitosamente.",
             data: toPlanResponse(plan),
         });
     }
@@ -81,7 +81,7 @@ export const update = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Plan updated successfully.",
+            message: "Plan actualizado exitosamente.",
             data: toPlanResponse(plan),
         });
     }
@@ -109,7 +109,7 @@ export const deactivate = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Plan deactivated successfully.",
+            message: "Plan desactivado exitosamente.",
             data: toPlanResponse(plan),
         });
     }

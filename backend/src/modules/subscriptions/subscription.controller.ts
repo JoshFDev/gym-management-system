@@ -5,6 +5,8 @@ import {
     createSubscription,
     getSubscriptions,
     renewSubscription,
+    cancelSubscription,
+    deleteSubscription,
 } from "./subscription.service";
 import { toSubscriptionResponse } from "./subscription.dto";
 import { logAudit } from "../auditLog/auditLog.service";
@@ -31,24 +33,27 @@ export const create = asyncHandler(
 
         res.status(201).json({
             success: true,
-            message: "Subscription created successfully.",
-            data: subscription,
+            message: "Suscripción creada exitosamente.",
+            data: toSubscriptionResponse(subscription),
         });
     }
 );
 
 export const getAll = asyncHandler(
     async (req: Request, res: Response) => {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-        const result = await getSubscriptions(page, limit);
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const search = req.query.search as string | undefined;
+        const planId = req.query.planId as string | undefined;
+        const status = req.query.status as string | undefined;
+        const result = await getSubscriptions(page, limit, search, planId, status);
         res.status(200).json({
             success: true,
             data: result.items.map(toSubscriptionResponse),
             total: result.total,
+            totalPages: result.totalPages,
             page: result.page,
             limit: result.limit,
-            totalPages: result.totalPages,
         });
     }
 );
@@ -74,17 +79,55 @@ export const renew = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Subscription renewed successfully.",
-            data: {
-                id: subscription._id.toString(),
-                memberId: subscription.memberId.toString(),
-                planId: subscription.planId.toString(),
-                startDate: subscription.startDate,
-                endDate: subscription.endDate,
-                status: subscription.status,
-                createdAt: subscription.createdAt,
-                updatedAt: subscription.updatedAt,
-            },
+            message: "Suscripción renovada exitosamente.",
+            data: toSubscriptionResponse(subscription),
+        });
+    }
+);
+
+export const cancel = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const subscription = await cancelSubscription(req.params.id as string);
+
+        await logAudit({
+            action: "UPDATE",
+            entity: "Subscription",
+            entityId: subscription._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { status: "cancelled" },
+        });
+
+        notifyAll({
+            type: "subscription_cancelled",
+            title: "Suscripción cancelada",
+            message: `Suscripción cancelada por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Suscripción cancelada exitosamente.",
+            data: toSubscriptionResponse(subscription),
+        });
+    }
+);
+
+export const remove = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const subscription = await deleteSubscription(req.params.id as string);
+
+        await logAudit({
+            action: "DELETE",
+            entity: "Subscription",
+            entityId: req.params.id as string,
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Suscripción eliminada exitosamente.",
         });
     }
 );

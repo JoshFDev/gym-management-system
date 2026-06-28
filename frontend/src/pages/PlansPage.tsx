@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPlan, getPlans, updatePlan } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
@@ -115,6 +116,7 @@ const emptyForm = { name: "", description: "", price: "", durationDays: "" };
 export default function PlansPage() {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -133,13 +135,13 @@ export default function PlansPage() {
         try {
             const res = await getPlans(debouncedSearch);
             setPlans(res.data ?? []);
-        } catch { setPlans([]); }
+        } catch { setError(true); }
     }, [debouncedSearch]);
 
     useSocketRefresh(["plan_created", "plan_updated", "plan_deactivated"], loadPlans);
 
     useEffect(() => {
-        (async () => { try { await loadPlans(); } catch { setPlans([]); } finally { setLoading(false); } })();
+        (async () => { try { await loadPlans(); } catch { setError(true); } finally { setLoading(false); } })();
     }, [loadPlans]);
 
     const openNew = () => { setEditingId(null); setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
@@ -174,13 +176,19 @@ export default function PlansPage() {
     const requestToggle = (plan: Plan) => { setConfirmTarget(plan); setConfirmOpen(true); };
     const confirmToggle = async () => {
         if (!confirmTarget) return;
+        const newStatus = confirmTarget.status === "active" ? "inactive" : "active";
+        const prev = plans;
+        setPlans((current) => current.map((p) => p.id === confirmTarget.id ? { ...p, status: newStatus } : p));
         setConfirmLoading(true);
         try {
-            const newStatus = confirmTarget.status === "active" ? "inactive" : "active";
             await updatePlan(confirmTarget.id, { status: newStatus });
             addToast(newStatus === "active" ? "Plan activado" : "Plan desactivado");
-            await loadPlans();
-        } catch { addToast("No se pudo cambiar el estado.", "error"); } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
+        } catch {
+            setPlans(prev);
+            addToast("No se pudo cambiar el estado.", "error");
+        } finally {
+            setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null);
+        }
     };
     const isDeactivating = confirmTarget?.status === "active";
 
@@ -201,8 +209,16 @@ export default function PlansPage() {
                 </div>
             </div>
             <div style={s.content}>
-                {loading ? (
-                    <p style={s.empty}>Cargando planes…</p>
+                {error ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                        <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
+                        <button onClick={() => { setError(false); setLoading(true); loadPlans().finally(() => setLoading(false)); }}
+                            style={{ background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            Reintentar
+                        </button>
+                    </div>
+                ) : loading ? (
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : plans.length === 0 ? (
                     <p style={s.empty}>No hay planes registrados.</p>
                 ) : (

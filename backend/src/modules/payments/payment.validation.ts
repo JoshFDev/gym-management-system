@@ -5,7 +5,7 @@ import {
     PaymentStatus,
 } from "./payment.types";
 
-const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId.");
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "ID inválido.");
 
 export const createPaymentSchema = z.object({
     memberId: objectId,
@@ -14,7 +14,7 @@ export const createPaymentSchema = z.object({
 
     amount: z
         .number()
-        .min(0, "Amount cannot be negative."),
+        .min(0, "El monto no puede ser negativo."),
 
     method: z
         .enum(PaymentMethod),

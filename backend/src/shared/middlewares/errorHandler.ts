@@ -23,6 +23,6 @@ export const errorHandler = (
     // Error genérico para el cliente
     res.status(500).json({
         success: false,
-        message: "Internal Server Error",
+        message: "Error interno del servidor",
     });
 };

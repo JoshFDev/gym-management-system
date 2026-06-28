@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { getSubscriptions, createSubscription, renewSubscription } from "../services/subscription.service";
+import { getSubscriptions, createSubscription, renewSubscription, cancelSubscription, deleteSubscription } from "../services/subscription.service";
 import { getMembers } from "../services/member.service";
 import { getPlans } from "../services/plan.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
 import ConfirmModal from "../components/ConfirmModal";
@@ -33,12 +34,13 @@ const statusStyle = (status: string): React.CSSProperties => {
         active: { background: "#F0F7F1", color: "#3a7d44" },
         expired: { background: "#FFF4F0", color: "#c0392b" },
         pending: { background: "#FFFBF0", color: "#b7791f" },
+        cancelled: { background: "#F0F0EE", color: "#888" },
     };
     return map[status] ?? { background: "#F0F0EE", color: "#888" };
 };
 
 const statusLabel: Record<string, string> = {
-    active: "Activo", expired: "Vencido", pending: "Pendiente",
+    active: "Activo", expired: "Vencido", pending: "Pendiente", cancelled: "Cancelada",
 };
 
 const fmtDate = (d: Date | string) =>
@@ -132,8 +134,8 @@ const daysLabel = (days: number, status: string) => {
 
 function exportExcel(subscriptions: Subscription[]) {
     const rows = subscriptions.map((sub) => ({
-        Miembro: sub.member.fullName, Email: sub.member.email ?? "", Teléfono: sub.member.phone ?? "",
-        Plan: sub.plan.name, Precio: sub.plan.price,
+        Miembro: sub.member?.fullName ?? "—", Email: sub.member?.email ?? "", Teléfono: sub.member?.phone ?? "",
+        Plan: sub.plan?.name ?? "—", Precio: sub.plan?.price ?? 0,
         Inicio: new Date(sub.startDate).toLocaleDateString("es-MX"),
         Vencimiento: new Date(sub.endDate).toLocaleDateString("es-MX"),
         "Días restantes": daysLeft(sub.endDate),
@@ -155,7 +157,7 @@ function exportPDF(subscriptions: Subscription[]) {
     autoTable(doc, {
         startY: 28, head: [["Miembro", "Email", "Plan", "Precio", "Inicio", "Vencimiento", "Días rest.", "Estado"]],
         body: subscriptions.map((sub) => [
-            sub.member.fullName, sub.member.email ?? "—", sub.plan.name, `$${sub.plan.price}`,
+            sub.member?.fullName ?? "—", sub.member?.email ?? "—", sub.plan?.name ?? "—", `$${sub.plan?.price ?? 0}`,
             new Date(sub.startDate).toLocaleDateString("es-MX"),
             new Date(sub.endDate).toLocaleDateString("es-MX"),
             daysLabel(daysLeft(sub.endDate), sub.status),
@@ -173,6 +175,7 @@ export default function SubscriptionsPage() {
     const [members, setMembers] = useState<Member[]>([]);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [formValues, setFormValues] = useState({ memberId: "", planId: "" });
@@ -186,32 +189,59 @@ export default function SubscriptionsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const limit = 20;
+
+    const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [planFilter, setPlanFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+    const [cancelLoading, setCancelLoading] = useState(false);
+
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
     const { addToast } = useToast();
 
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 400);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     const load = async (targetPage: number) => {
-        const res = await getSubscriptions(targetPage, limit);
+        const extra: { search?: string; planId?: string; status?: string } = {};
+        if (debouncedSearch.trim()) extra.search = debouncedSearch.trim();
+        if (planFilter) extra.planId = planFilter;
+        if (statusFilter) extra.status = statusFilter;
+        const res = await getSubscriptions(targetPage, limit, extra);
         setSubscriptions(res.data ?? []);
         setTotal(res.total ?? 0);
         setTotalPages(res.totalPages ?? 1);
     };
 
-    useSocketRefresh(["subscription_created", "subscription_renewed"], () => load(page));
+    useSocketRefresh(["subscription_created", "subscription_renewed", "subscription_cancelled"], () => load(page));
 
     useEffect(() => {
         const init = async () => {
             try {
+                const extra: { search?: string; planId?: string; status?: string } = {};
+                if (debouncedSearch.trim()) extra.search = debouncedSearch.trim();
+                if (planFilter) extra.planId = planFilter;
+                if (statusFilter) extra.status = statusFilter;
                 const [subsRes, membersRes, plansRes] = await Promise.all([
-                    getSubscriptions(page, limit), getMembers(), getPlans(),
+                    getSubscriptions(page, limit, extra), getMembers(), getPlans(),
                 ]);
                 setSubscriptions(subsRes.data ?? []);
                 setTotal(subsRes.total ?? 0);
                 setTotalPages(subsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setPlans((plansRes.data ?? []).filter((p: Plan) => p.status === "active"));
-            } catch { addToast("Error al cargar datos", "error"); } finally { setLoading(false); }
+            } catch { setError(true); } finally { setLoading(false); }
         };
         init();
-    }, [page]);
+    }, [page, debouncedSearch, planFilter, statusFilter, addToast]);
 
     const openNew = () => { setFormValues({ memberId: "", planId: "" }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -246,6 +276,36 @@ export default function SubscriptionsPage() {
         } catch { addToast("Error al renovar.", "error"); } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
 
+    const requestCancel = (id: string) => { setCancelTarget(id); setCancelOpen(true); };
+    const confirmCancel = async () => {
+        if (!cancelTarget) return;
+        const prev = subscriptions;
+        setSubscriptions((current) => current.map((s) => s.id === cancelTarget ? { ...s, status: "cancelled" } : s));
+        setCancelLoading(true);
+        try {
+            await cancelSubscription(cancelTarget);
+            addToast("Suscripción cancelada");
+        } catch {
+            setSubscriptions(prev);
+            addToast("Error al cancelar.", "error");
+        } finally { setCancelLoading(false); setCancelOpen(false); setCancelTarget(null); }
+    };
+
+    const requestDelete = (id: string) => { setDeleteTarget(id); setDeleteOpen(true); };
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        const prev = subscriptions;
+        setSubscriptions((current) => current.filter((s) => s.id !== deleteTarget));
+        setDeleteLoading(true);
+        try {
+            await deleteSubscription(deleteTarget);
+            addToast("Suscripción eliminada");
+        } catch {
+            setSubscriptions(prev);
+            addToast("Error al eliminar.", "error");
+        } finally { setDeleteLoading(false); setDeleteOpen(false); setDeleteTarget(null); }
+    };
+
     return (
         <div style={s.page}>
 
@@ -253,19 +313,52 @@ export default function SubscriptionsPage() {
                 body="¿Renovar esta suscripción? Se extenderá la fecha de vencimiento según los días del plan."
                 confirmLabel="Sí, renovar" loading={confirmLoading}
                 onConfirm={confirmRenew} onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }} />
+            <ConfirmModal open={cancelOpen} title="Cancelar suscripción"
+                body="¿Cancelar esta suscripción? Esta acción no se puede deshacer."
+                confirmLabel="Sí, cancelar" loading={cancelLoading} confirmColor="#c0392b"
+                onConfirm={confirmCancel} onCancel={() => { setCancelOpen(false); setCancelTarget(null); }} />
+            <ConfirmModal open={deleteOpen} title="Eliminar suscripción"
+                body="¿Eliminar esta suscripción permanentemente? Esta acción no se puede deshacer."
+                confirmLabel="Sí, eliminar" loading={deleteLoading} confirmColor="#c0392b"
+                onConfirm={confirmDelete} onCancel={() => { setDeleteOpen(false); setDeleteTarget(null); }} />
             <SubscriptionDrawer open={drawerOpen} saving={saving} values={formValues} errors={errors} touched={touched}
                 members={members} plans={plans} onChange={handleFieldChange} onBlur={handleBlur}
                 onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Suscripciones" action={<GymButton icon="ti-plus" onClick={openNew}>Nueva suscripción</GymButton>} />
             <div style={s.content}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input placeholder="Buscar miembro…" value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        style={{ ...s.input, maxWidth: 200 }} />
+                    <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }} style={{ ...s.input, maxWidth: 160 }}>
+                        <option value="">Todos los planes</option>
+                        {plans.filter((p: Plan) => p.status === "active").map((p: Plan) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} style={{ ...s.input, maxWidth: 140 }}>
+                        <option value="">Todos los estados</option>
+                        <option value="active">Activa</option>
+                        <option value="expired">Vencida</option>
+                        <option value="cancelled">Cancelada</option>
+                    </select>
+                </div>
                 {!loading && subscriptions.length > 0 && (
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                         <button style={s.exportBtn} onClick={() => exportExcel(subscriptions)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
                         <button style={s.exportBtn} onClick={() => exportPDF(subscriptions)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
                     </div>
                 )}
-                {loading ? (
-                    <p style={s.empty}>Cargando suscripciones…</p>
+                {error ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                        <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
+                        <button onClick={() => { setError(false); setLoading(true); load(page).catch(() => setError(true)).finally(() => setLoading(false)); }}
+                            style={{ background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            Reintentar
+                        </button>
+                    </div>
+                ) : loading ? (
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : subscriptions.length === 0 ? (
                     <p style={s.empty}>No hay suscripciones registradas.</p>
                 ) : (
@@ -281,11 +374,11 @@ export default function SubscriptionsPage() {
                                 return (
                                     <tr key={sub.id} style={s.row}>
                                         <td style={s.td}>
-                                            <p style={{ fontWeight: 500, margin: 0, fontSize: 13, color: "#1a1a1a" }}>{sub.member.fullName}</p>
-                                            <p style={{ fontSize: 11, color: "#bbb", margin: 0 }}>{sub.member.email ?? sub.member.phone ?? ""}</p>
+                                            <p style={{ fontWeight: 500, margin: 0, fontSize: 13, color: "#1a1a1a" }}>{sub.member?.fullName ?? "—"}</p>
+                                            <p style={{ fontSize: 11, color: "#bbb", margin: 0 }}>{sub.member?.email ?? sub.member?.phone ?? ""}</p>
                                         </td>
-                                        <td style={{ ...s.td, fontWeight: 500 }}>{sub.plan.name}</td>
-                                        <td style={{ ...s.td, ...s.muted }}>${sub.plan.price}</td>
+                                        <td style={{ ...s.td, fontWeight: 500 }}>{sub.plan?.name ?? "—"}</td>
+                                        <td style={{ ...s.td, ...s.muted }}>${sub.plan?.price ?? 0}</td>
                                         <td style={{ ...s.td, ...s.muted }}>{fmtDate(sub.startDate)}</td>
                                         <td style={{ ...s.td, ...s.muted }}>{fmtDate(sub.endDate)}</td>
                                         <td style={s.td}>
@@ -295,10 +388,25 @@ export default function SubscriptionsPage() {
                                         </td>
                                         <td style={s.td}><span style={{ ...s.badge, ...statusStyle(sub.status) }}>{statusLabel[sub.status] ?? sub.status}</span></td>
                                         <td style={s.td}>
-                                            <button style={{ ...s.btnAction, opacity: sub.status === "active" ? 0.4 : 1, cursor: sub.status === "active" ? "not-allowed" : "pointer" }}
-                                                onClick={() => requestRenew(sub.id)} disabled={sub.status === "active"}>
-                                                <i className="ti ti-refresh" style={{ fontSize: 13 }} aria-hidden />Renovar
-                                            </button>
+                                            <div style={{ display: "flex", gap: 6 }}>
+                                                {sub.status === "cancelled" ? (
+                                                    <button style={{ ...s.btnAction, color: "#c0392b" }}
+                                                        onClick={() => requestDelete(sub.id)}>
+                                                        <i className="ti ti-trash" style={{ fontSize: 13 }} aria-hidden />Eliminar
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button style={{ ...s.btnAction, opacity: sub.status === "active" ? 0.4 : 1, cursor: sub.status === "active" ? "not-allowed" : "pointer" }}
+                                                            onClick={() => requestRenew(sub.id)} disabled={sub.status === "active"}>
+                                                            <i className="ti ti-refresh" style={{ fontSize: 13 }} aria-hidden />Renovar
+                                                        </button>
+                                                        <button style={{ ...s.btnAction, color: "#c0392b", opacity: sub.status === "cancelled" ? 0.4 : 1, cursor: sub.status === "cancelled" ? "not-allowed" : "pointer" }}
+                                                            onClick={() => requestCancel(sub.id)} disabled={sub.status === "cancelled"}>
+                                                            <i className="ti ti-x" style={{ fontSize: 13 }} aria-hidden />Cancelar
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );

@@ -2,7 +2,7 @@ import { AppError } from "./AppError";
 
 export class ForbiddenError extends AppError {
     constructor(
-        message = "Forbidden"
+        message = "Prohibido"
     ) {
         super(message, 403);
     }

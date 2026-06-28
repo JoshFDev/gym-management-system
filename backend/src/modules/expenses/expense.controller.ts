@@ -19,7 +19,7 @@ export const create = asyncHandler(async (req: AuthRequest, res: Response) => {
 
     await logAudit({ action: "CREATE", entity: "Expense", entityId: expense._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: req.body });
 
-    res.status(201).json({ success: true, message: "Expense created.", data: toExpenseResponse(expense) });
+    res.status(201).json({ success: true, message: "Gasto creado.", data: toExpenseResponse(expense) });
 });
 
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
@@ -51,7 +51,7 @@ export const update = asyncHandler(async (req: AuthRequest, res: Response) => {
 
     await logAudit({ action: "UPDATE", entity: "Expense", entityId: expense._id.toString(), userId: req.user!.userId, userRole: req.user!.role, changes: req.body });
 
-    res.status(200).json({ success: true, message: "Expense updated.", data: toExpenseResponse(expense) });
+    res.status(200).json({ success: true, message: "Gasto actualizado.", data: toExpenseResponse(expense) });
 });
 
 export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -60,7 +60,7 @@ export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
     await logAudit({ action: "DELETE", entity: "Expense", entityId: expense._id.toString(), userId: req.user!.userId, userRole: req.user!.role });
     notifyAdmins({ type: "info", title: "Gasto eliminado", message: `${EXPENSE_CATEGORY_LABELS[expense.category as keyof typeof EXPENSE_CATEGORY_LABELS] || expense.category}: $${expense.amount}`, timestamp: new Date().toISOString() });
 
-    res.status(200).json({ success: true, message: "Expense deleted." });
+    res.status(200).json({ success: true, message: "Gasto eliminado." });
 });
 
 export const report = asyncHandler(async (req: Request, res: Response) => {

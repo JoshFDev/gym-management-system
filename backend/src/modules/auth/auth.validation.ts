@@ -5,23 +5,23 @@ export const registerSchema = z.object({
     firstName: z
         .string()
         .trim()
-        .min(2, "First name must be at least 2 characters.")
-        .max(50, "First name cannot exceed 50 characters."),
+        .min(2, "El nombre debe tener al menos 2 caracteres.")
+        .max(50, "El nombre no puede exceder 50 caracteres."),
 
     lastName: z
         .string()
         .trim()
-        .min(2, "Last name must be at least 2 characters.")
-        .max(50, "Last name cannot exceed 50 characters."),
+        .min(2, "El apellido debe tener al menos 2 caracteres.")
+        .max(50, "El apellido no puede exceder 50 caracteres."),
 
     email: z
         .string()
-        .email("Invalid email address.")
+        .email("Correo electrónico inválido.")
         .transform((email) => email.toLowerCase()),
 
     password: z
         .string()
-        .min(8, "Password must be at least 8 characters."),
+        .min(8, "La contraseña debe tener al menos 8 caracteres."),
 
     role: z.enum(UserRole),
 
@@ -33,18 +33,18 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
     email: z
-        .email("Invalid email address.")
+        .email("Correo electrónico inválido.")
         .transform((email) => email.toLowerCase()),
 
     password: z
         .string()
-        .min(1, "Password is required."),
+        .min(1, "La contraseña es obligatoria."),
 });
 
 export const forgotPasswordSchema = z.object({
     email: z
         .string()
-        .email("Invalid email"),
+        .email("Correo inválido"),
 });
 
 export const resetPasswordSchema = z.object({
@@ -52,14 +52,14 @@ export const resetPasswordSchema = z.object({
         .string()
         .min(
             8,
-            "Password must be at least 8 characters"
+            "La contraseña debe tener al menos 8 caracteres"
         ),
 });
 
 
 export const changePasswordSchema = z.object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "New password must be at least 8 characters"),
+    currentPassword: z.string().min(1, "La contraseña actual es obligatoria"),
+    newPassword: z.string().min(8, "La nueva contraseña debe tener al menos 8 caracteres"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

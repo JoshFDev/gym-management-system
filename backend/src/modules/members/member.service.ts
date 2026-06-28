@@ -2,8 +2,12 @@ import Member from "./member.model";
 import { MembershipStatus } from "./member.types";
 import { CreateMemberInput } from "./member.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
+import { BadRequestError } from "../../shared/errors/BadRequestError";
 import { UpdateMemberInput } from "./member.validation";
 import AuditLog from "../auditLog/auditLog.model";
+import Subscription from "../subscriptions/subscription.model";
+import { SubscriptionStatus } from "../subscriptions/subscription.types";
+import Payment from "../payments/payment.model";
 import { paginate } from "../../shared/utils/pagination";
 
 export const createMember = async (
@@ -47,7 +51,7 @@ export const getMemberById = async (
 
     if (!member) {
         throw new NotFoundError(
-            "Member not found."
+            "Miembro no encontrado."
         );
     }
 
@@ -62,12 +66,34 @@ export const updateMember = async (
 
     if (!member) {
         throw new NotFoundError(
-            "Member not found."
+            "Miembro no encontrado."
         );
     }
 
     Object.assign(member, data);
     await member.save();
+
+    return member;
+};
+
+export const deleteMember = async (id: string) => {
+    const activeSub = await Subscription.findOne({
+        memberId: id,
+        status: SubscriptionStatus.ACTIVE,
+    });
+    if (activeSub) {
+        throw new BadRequestError("El miembro tiene una suscripción activa. No se puede eliminar.");
+    }
+
+    const hasPayments = await Payment.exists({ memberId: id });
+    if (hasPayments) {
+        throw new BadRequestError("El miembro tiene pagos registrados. Cancele o marque como reembolso antes de eliminar.");
+    }
+
+    const member = await Member.findByIdAndDelete(id);
+    if (!member) {
+        throw new NotFoundError("Miembro no encontrado.");
+    }
 
     return member;
 };
@@ -89,7 +115,7 @@ export const deactivateMember = async (
 
     if (!member) {
         throw new NotFoundError(
-            "Member not found."
+            "Miembro no encontrado."
         );
     }
 

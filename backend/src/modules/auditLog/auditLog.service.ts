@@ -13,8 +13,11 @@ export const logAudit = async (params: LogAuditParams) => {
     await AuditLog.create(params);
 };
 
-export const getAuditLogs = async () => {
-    const logs = await AuditLog.find()
+export const getAuditLogs = async (entity?: string) => {
+    const filter: Record<string, unknown> = {};
+    if (entity) filter.entity = entity;
+
+    const logs = await AuditLog.find(filter)
         .populate("userId", "firstName lastName email")
         .sort({ createdAt: -1 })
         .limit(200);

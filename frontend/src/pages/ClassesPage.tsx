@@ -3,6 +3,7 @@ import { getClasses, createClass, updateClass, deactivateClass, reactivateClass,
 import { getUsers } from "../services/user.service";
 import type { UserResponse } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useToast } from "../hooks/useToast";
@@ -15,7 +16,7 @@ function DayRangeBar({ start, end }: { start: number; end: number }) {
     return (
         <div style={{ marginTop: 8 }}>
             <div style={{ display: "flex", gap: 2 }}>
-                {DAYS.map((d, i) => (
+                {DAYS.map((_, i) => (
                     <div key={i} style={{
                         flex: 1, height: 4, borderRadius: 2,
                         background: i >= start && i <= end ? "#3b82f6" : "#E5E4E2",
@@ -41,6 +42,7 @@ export default function ClassesPage() {
     const [classes, setClasses] = useState<ClassSchedule[]>([]);
     const [trainers, setTrainers] = useState<UserResponse[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState(emptyForm);
@@ -58,17 +60,32 @@ export default function ClassesPage() {
 
     const { addToast } = useToast();
 
+    const fetchData = useCallback(async () => {
+        const [classRes, userRes] = await Promise.all([getClasses(), getUsers("trainer")]);
+        return { classes: classRes.data as ClassSchedule[], trainers: userRes.data as UserResponse[] };
+    }, []);
+
     const load = useCallback(async () => {
         try {
-            const [classRes, userRes] = await Promise.all([getClasses(), getUsers("trainer")]);
-            setClasses(classRes.data ?? []);
-            setTrainers(userRes.data ?? []);
-        } catch { addToast("Error al cargar clases", "error"); }
+            const data = await fetchData();
+            setClasses(data.classes);
+            setTrainers(data.trainers);
+        } catch { setError(true); }
         finally { setLoading(false); }
-    }, [addToast]);
+    }, [fetchData, addToast]);
 
-    useEffect(() => { load(); }, [load]);
     useSocketRefresh(["class_created", "class_updated", "class_deactivated"], load);
+
+    useEffect(() => {
+        let active = true;
+        fetchData().then(data => {
+            if (!active) return;
+            setClasses(data.classes);
+            setTrainers(data.trainers);
+        }).catch(() => { if (active) setError(true); })
+        .finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
+    }, [fetchData, addToast]);
 
     const filtered = useMemo(() => {
         return classes.filter((c) => {
@@ -130,20 +147,37 @@ export default function ClassesPage() {
     const handleConfirm = async () => {
         if (!confirmTarget) return;
         setConfirmLoading(true);
-        try {
-            if (confirmMode === "deactivate") {
+        const prev = classes;
+        if (confirmMode === "deactivate") {
+            setClasses((current) => current.map((c) => c.id === confirmTarget.id ? { ...c, status: "inactive" } : c));
+            try {
                 await deactivateClass(confirmTarget.id);
                 addToast(`Clase "${confirmTarget.name}" desactivada`);
-            } else if (confirmMode === "reactivate") {
+            } catch {
+                setClasses(prev);
+                addToast("Error al desactivar", "error");
+            }
+        } else if (confirmMode === "reactivate") {
+            setClasses((current) => current.map((c) => c.id === confirmTarget.id ? { ...c, status: "active" } : c));
+            try {
                 await reactivateClass(confirmTarget.id);
                 addToast(`Clase "${confirmTarget.name}" reactivada`);
-            } else {
+            } catch {
+                setClasses(prev);
+                addToast("Error al reactivar", "error");
+            }
+        } else {
+            setClasses((current) => current.filter((c) => c.id !== confirmTarget.id));
+            try {
                 await deleteClass(confirmTarget.id);
                 addToast(`Clase "${confirmTarget.name}" eliminada`);
+            } catch {
+                setClasses(prev);
+                addToast("Error al eliminar", "error");
             }
-            setConfirmOpen(false); setConfirmTarget(null); load();
-        } catch { addToast("Error", "error"); }
-        finally { setConfirmLoading(false); }
+        }
+        setConfirmOpen(false); setConfirmTarget(null);
+        setConfirmLoading(false);
     };
 
     useEffect(() => { if (drawerOpen) setTimeout(() => firstRef.current?.focus(), 200); }, [drawerOpen]);
@@ -173,8 +207,16 @@ export default function ClassesPage() {
             </div>
 
             <div style={s.content}>
-                {loading ? (
-                    <p style={s.empty}>Cargando...</p>
+                {error ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                        <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
+                        <button onClick={() => { setError(false); setLoading(true); load().finally(() => setLoading(false)); }}
+                            style={{ background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            Reintentar
+                        </button>
+                    </div>
+                ) : loading ? (
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : filtered.length === 0 ? (
                     <p style={s.empty}>No hay clases con los filtros actuales.</p>
                 ) : (

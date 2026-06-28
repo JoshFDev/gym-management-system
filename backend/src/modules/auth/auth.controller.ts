@@ -19,7 +19,7 @@ export const register = asyncHandler(
 
         res.status(201).json({
             success: true,
-            message: "User registered successfully.",
+            message: "Usuario registrado exitosamente.",
             data: toUserResponse(user),
         });
 
@@ -33,7 +33,7 @@ export const login = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Login successful.",
+            message: "Inicio de sesión exitoso.",
             data: {
                 token,
                 user: toUserResponse(user),
@@ -58,7 +58,7 @@ export const adminOnly = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Welcome admin.",
+            message: "Bienvenido admin.",
         });
 
     }
@@ -72,7 +72,7 @@ export const forgotPasswordHandler = asyncHandler(
         res.status(200).json({
             success: true,
             message:
-                "If the email exists, a password reset link has been sent.",
+                "Si el correo existe, se ha enviado un enlace de restablecimiento.",
         });
 
     }
@@ -89,7 +89,7 @@ export const resetPasswordHandler = asyncHandler(
         res.status(200).json({
             success: true,
             message:
-                "Password reset successfully.",
+                "Contraseña restablecida exitosamente.",
         });
 
     }
@@ -102,7 +102,7 @@ export const changePasswordHandler = asyncHandler(
 
         res.status(200).json({
             success: true,
-            message: "Password changed successfully.",
+            message: "Contraseña cambiada exitosamente.",
         });
 
     }

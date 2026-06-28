@@ -3,10 +3,12 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../hooks/useToast";
-import { createPayment, getPayments } from "../services/payment.service";
+import { useAuth } from "../hooks/useAuth";
+import { createPayment, getPayments, refundPayment } from "../services/payment.service";
 import { getMembers } from "../services/member.service";
 import { getSubscriptions } from "../services/subscription.service";
 import PageHeader from "../components/PageHeader";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -14,7 +16,7 @@ import { useSocketRefresh } from "../hooks/useSocketRefresh";
 interface Payment {
     id: string;
     member: { id: string; fullName: string; email?: string; phone?: string };
-    subscription: { id: string; startDate: string; endDate: string; status: string; planName?: string; planPrice?: number };
+    subscription: { id: string; startDate: string; endDate: string; status: string; planName?: string };
     amount: number;
     method: string;
     status: string;
@@ -32,9 +34,10 @@ interface FormErrors { memberId?: string; subscriptionId?: string; amount?: stri
 const statusStyle = (status: string): React.CSSProperties => ({
     paid: { background: "#F0F7F1", color: "#3a7d44" },
     pending: { background: "#FFF4F0", color: "#c0392b" },
+    refunded: { background: "#F0F0EE", color: "#888", textDecoration: "line-through" },
 }[status] ?? { background: "#F0F0EE", color: "#888" });
 
-const statusLabel: Record<string, string> = { paid: "Pagado", pending: "Pendiente" };
+const statusLabel: Record<string, string> = { paid: "Pagado", pending: "Pendiente", refunded: "Reembolsado" };
 const methodLabel: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
@@ -91,7 +94,7 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
     const handleProceed = (e: React.MouseEvent) => {
         e.preventDefault();
         setProcessed(false);
-        const synthetic = { preventDefault: () => {} } as React.FormEvent;
+        const synthetic = { preventDefault: () => { } } as React.FormEvent;
         onSubmit(synthetic);
     };
 
@@ -122,7 +125,7 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
                             onBlur={() => onBlur("subscriptionId")} disabled={!values.memberId}>
                             <option value="">{!values.memberId ? "Primero selecciona un miembro" : memberSubscriptions.length === 0 ? "Sin suscripciones activas" : "Seleccionar suscripción"}</option>
                             {memberSubscriptions.map((sub) => (
-                                <option key={sub.id} value={sub.id}>{sub.plan.name} — vence {fmtDate(sub.endDate)}</option>
+                                <option key={sub.id} value={sub.id}>{sub.plan?.name ?? "Plan"} — vence {fmtDate(sub.endDate)}</option>
                             ))}
                         </select>
                     </Field>
@@ -203,7 +206,7 @@ function PaymentDrawer({ open, saving, values, errors, touched, members, memberS
                             <button type="submit" style={{ ...s.btnPrimary, opacity: saving || processing ? 0.7 : 1 }} disabled={saving || processing}>
                                 {processing ? <><span style={s.spinner} />Procesando…</>
                                     : values.method === "card" ? <><i className="ti ti-credit-card" style={{ fontSize: 13 }} aria-hidden />Cobrar tarjeta</>
-                                    : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Registrar pago</>}
+                                        : <><i className="ti ti-check" style={{ fontSize: 13 }} aria-hidden />Registrar pago</>}
                             </button>
                         </div>
                     )}
@@ -267,11 +270,14 @@ export default function PaymentsPage() {
     const [members, setMembers] = useState<Member[]>([]);
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [formValues, setFormValues] = useState({ ...emptyForm });
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [refundingId, setRefundingId] = useState<string | null>(null);
+    const [refundingLoading, setRefundingLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -281,31 +287,34 @@ export default function PaymentsPage() {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const limit = 20;
+    const { user: currentUser } = useAuth();
     const { addToast } = useToast();
 
     const uniquePlans = Array.from(
-        new Map(subscriptions.filter(s => s.plan.name).map(s => [s.plan.id, s.plan])).values()
+        new Map(subscriptions.filter(s => s.plan?.name).map(s => [s.plan.id, s.plan])).values()
     );
     const hasActiveFilters = search || statusFilter || planFilter || dateFrom || dateTo;
 
     const memberSubscriptions = subscriptions.filter(
-        (sub) => sub.member.id === formValues.memberId && sub.status === "active"
+        (sub) => sub.member?.id === formValues.memberId && sub.status === "active"
     );
 
     const loadPayments = async (targetPage: number) => {
-        const filters: Record<string, string> = {};
-        if (search) filters.search = search;
-        if (statusFilter) filters.status = statusFilter;
-        if (planFilter) filters.planId = planFilter;
-        if (dateFrom) filters.dateFrom = dateFrom;
-        if (dateTo) filters.dateTo = dateTo;
-        const res = await getPayments(targetPage, limit, filters);
-        setPayments(res.data ?? []);
-        setTotal(res.total ?? 0);
-        setTotalPages(res.totalPages ?? 1);
+        try {
+            const filters: Record<string, string> = {};
+            if (search) filters.search = search;
+            if (statusFilter) filters.status = statusFilter;
+            if (planFilter) filters.planId = planFilter;
+            if (dateFrom) filters.dateFrom = dateFrom;
+            if (dateTo) filters.dateTo = dateTo;
+            const res = await getPayments(targetPage, limit, filters);
+            setPayments(res.data ?? []);
+            setTotal(res.total ?? 0);
+            setTotalPages(res.totalPages ?? 1);
+        } catch { setError(true); }
     };
 
-    useSocketRefresh(["payment_created"], () => loadPayments(page));
+    useSocketRefresh(["payment_created", "payment_refunded"], () => loadPayments(page));
 
     useEffect(() => {
         const init = async () => {
@@ -324,10 +333,10 @@ export default function PaymentsPage() {
                 setTotalPages(paymentsRes.totalPages ?? 1);
                 setMembers(membersRes.data ?? []);
                 setSubscriptions(subsRes.data ?? []);
-            } catch { addToast("Error al cargar datos", "error"); } finally { setLoading(false); }
+            } catch { setError(true); } finally { setLoading(false); }
         };
         init();
-    }, [page, search, statusFilter, planFilter, dateFrom, dateTo]);
+    }, [page, search, statusFilter, planFilter, dateFrom, dateTo, addToast]);
 
     const openNew = () => { setFormValues({ ...emptyForm }); setErrors({}); setTouched({}); setDrawerOpen(true); };
 
@@ -363,40 +372,60 @@ export default function PaymentsPage() {
 
     const handlePrintTicket = (payment: Payment) => {
         const sub = subscriptions.find(s => s.id === payment.subscription.id);
-        const planName = payment.subscription.planName || sub?.plan.name || "—";
-        const planPrice = payment.subscription.planPrice ?? sub?.plan.price ?? 0;
+        const planName = payment.subscription.planName || sub?.plan?.name || "—";
         const ticketHtml = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Ticket de pago</title>
 <style>
-  body { font-family: 'Courier New', monospace; margin: 0; padding: 20px; text-align: center; }
-  .ticket { max-width: 300px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 2px; }
-  .divider { border-top: 1px dashed #333; margin: 10px 0; }
-  .row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; margin: 0 auto; padding: 8px 12px; }
+  h1 { font-size: 18px; text-align: center; letter-spacing: 2px; margin-bottom: 2px; }
+  .sub { text-align: center; font-size: 10px; color: #888; margin-bottom: 8px; }
+  .divider { border-top: 1px dashed #333; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; padding: 2px 0; }
   .label { color: #666; }
-  .thank { margin-top: 14px; font-size: 12px; color: #888; }
-  @media print { body { padding: 0; } }
+  .total { font-size: 14px; font-weight: 700; }
+  .thank { text-align: center; margin-top: 10px; font-size: 10px; color: #888; }
+  .folio { text-align: center; font-size: 10px; color: #aaa; margin-top: 4px; }
+  @media print { body { width: 80mm; padding: 0; } @page { margin: 0; size: 80mm auto; } }
 </style></head><body>
-<div class="ticket">
-  <h1>🏋️ ZenithGym</h1>
-  <p style="font-size:11px;color:#888;margin:0 0 6px;">Comprobante de pago</p>
+  <h1>ZENITHGYM</h1>
+  <p class="sub">Comprobante de pago</p>
   <div class="divider"></div>
   <div class="row"><span class="label">Folio</span><span>#${payment.id.slice(-8).toUpperCase()}</span></div>
   <div class="row"><span class="label">Fecha</span><span>${fmtDateTime(payment.paidAt)}</span></div>
+  <div class="row"><span class="label">Atendió</span><span>${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}</span></div>
+  <div class="divider"></div>
   <div class="row"><span class="label">Miembro</span><span>${payment.member.fullName}</span></div>
   <div class="row"><span class="label">Plan</span><span>${planName}</span></div>
   <div class="row"><span class="label">Vigencia</span><span>${fmtDate(payment.subscription.startDate)} – ${fmtDate(payment.subscription.endDate)}</span></div>
   <div class="divider"></div>
-  <div class="row"><span class="label">Monto</span><span style="font-weight:700;">$${payment.amount}</span></div>
   <div class="row"><span class="label">Método</span><span>${methodLabel[payment.method] ?? payment.method}</span></div>
+  <div class="row total"><span>Total</span><span>$${payment.amount.toFixed(2)}</span></div>
   <div class="row"><span class="label">Estado</span><span>${statusLabel[payment.status] ?? payment.status}</span></div>
   <div class="divider"></div>
   <p class="thank">¡Gracias por tu preferencia!</p>
-</div>
-<script>window.print();window.onafterprint=()=>window.close();setTimeout(()=>window.close(),1000);<\/script>
+  <p class="folio">ZenithGym · ${new Date().toLocaleDateString("es-MX")}</p>
+<script>window.print();window.onafterprint=()=>window.close();setTimeout(()=>window.close(),500);</script>
 </body></html>`;
         const win = window.open("", "_blank");
         if (win) { win.document.write(ticketHtml); win.document.close(); }
+    };
+
+    const handleRefund = async (paymentId: string) => {
+        const prev = payments;
+        setPayments((current) => current.map((p) => p.id === paymentId ? { ...p, status: "refunded" } : p));
+        setRefundingId(paymentId);
+        setRefundingLoading(true);
+        try {
+            await refundPayment(paymentId);
+            addToast("Pago reembolsado correctamente");
+        } catch {
+            setPayments(prev);
+            addToast("Error al reembolsar el pago.", "error");
+        } finally {
+            setRefundingLoading(false);
+            setRefundingId(null);
+        }
     };
 
     return (
@@ -432,8 +461,16 @@ export default function PaymentsPage() {
                     <button style={s.exportBtn} onClick={() => exportExcel(payments)}><i className="ti ti-file-spreadsheet" style={{ fontSize: 13 }} aria-hidden />Excel</button>
                     <button style={s.exportBtn} onClick={() => exportPDF(payments)}><i className="ti ti-file-text" style={{ fontSize: 13 }} aria-hidden />PDF</button>
                 </div>
-                {loading ? (
-                    <p style={s.empty}>Cargando pagos…</p>
+                {error ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                        <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
+                        <button onClick={() => { setError(false); setLoading(true); loadPayments(page).finally(() => setLoading(false)); }}
+                            style={{ background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                            Reintentar
+                        </button>
+                    </div>
+                ) : loading ? (
+                    <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
                 ) : payments.length === 0 ? (
                     <p style={s.empty}>No hay pagos registrados.</p>
                 ) : (
@@ -457,9 +494,19 @@ export default function PaymentsPage() {
                                     <td style={{ ...s.td, ...s.muted }}>{fmtDate(p.subscription.endDate)}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{p.notes ?? "—"}</td>
                                     <td style={s.td}>
-                                        <button style={s.ticketBtn} onClick={() => handlePrintTicket(p)} title="Imprimir ticket">
-                                            <i className="ti ti-receipt" style={{ fontSize: 13 }} aria-hidden /> Ticket
-                                        </button>
+                                        <div style={{ display: "flex", gap: 4 }}>
+                                            <button style={s.ticketBtn} onClick={() => handlePrintTicket(p)} title="Imprimir ticket">
+                                                <i className="ti ti-receipt" style={{ fontSize: 13 }} aria-hidden />
+                                            </button>
+                                            {p.status === "paid" && (
+                                                <button style={{ ...s.refundBtn, opacity: refundingLoading && refundingId === p.id ? 0.6 : 1 }}
+                                                    onClick={() => handleRefund(p.id)} disabled={refundingLoading && refundingId === p.id} title="Reembolsar">
+                                                    {refundingLoading && refundingId === p.id
+                                                        ? <span style={s.spinner} />
+                                                        : <i className="ti ti-arrow-back-up" style={{ fontSize: 13 }} aria-hidden />}
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}</tbody>
@@ -483,7 +530,8 @@ const s: Record<string, React.CSSProperties> = {
     filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const, cursor: "pointer" },
     clearBtn: { background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
     exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 11px", fontSize: 12, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
-    ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
+    ticketBtn: { background: "none", border: "1px solid #1a1a1a", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 500, color: "#1a1a1a", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
+    refundBtn: { background: "none", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 8px", fontSize: 11, fontWeight: 500, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 },
     toastStack: { position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" },
     toast: { display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 500, padding: "9px 14px", borderRadius: 8, animation: "fadeIn 0.2s ease", cursor: "pointer", pointerEvents: "all", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" },
     overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
