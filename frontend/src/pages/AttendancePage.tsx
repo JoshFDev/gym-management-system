@@ -13,6 +13,43 @@ import { useDebounce } from "../hooks/useDebounce";
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 
+function playBeep(checkOut = false) {
+    try {
+        const ctx = new AudioContext();
+        if (checkOut) {
+            // Double descending chime
+            const t = ctx.currentTime;
+            [660, 440].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, t + i * 0.12);
+                gain.gain.linearRampToValueAtTime(0.07, t + i * 0.12 + 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.25);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(t + i * 0.12);
+                osc.stop(t + i * 0.12 + 0.25);
+            });
+        } else {
+            // Rising chime: C5 → E5 → G5 (triad arpeggio)
+            const t = ctx.currentTime;
+            [523, 659, 784].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, t + i * 0.1);
+                gain.gain.linearRampToValueAtTime(0.07, t + i * 0.1 + 0.035);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 0.22);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(t + i * 0.1);
+                osc.stop(t + i * 0.1 + 0.22);
+            });
+        }
+    } catch { /* audio not supported */ }
+}
+
 interface Attendance {
     id: string;
     member: { id: string; fullName: string; email?: string; phone?: string };
@@ -342,7 +379,10 @@ export default function AttendancePage() {
 
     useSocketRefresh(["attendance_created"], () => { loadAttendances(page); });
 
+    const initRef = useRef(false);
     useEffect(() => {
+        if (initRef.current) return;
+        initRef.current = true;
         const init = async () => {
             try {
                 const f = buildFilters();
@@ -392,6 +432,7 @@ export default function AttendancePage() {
                         try {
                             const res = await createAttendance(member.id);
                             const isCheckOut = res.action === "check_out";
+                            playBeep(isCheckOut);
                             addToast(isCheckOut
                                 ? `Salida registrada: ${member.firstName} ${member.lastName}`
                                 : `Entrada registrada: ${member.firstName} ${member.lastName}`);
@@ -420,6 +461,7 @@ export default function AttendancePage() {
         setSubmitting(true);
         try {
             const res = await createAttendance(memberId);
+            playBeep(res.action === "check_out");
             addToast(res.action === "check_out" ? "Salida registrada" : "Entrada registrada");
             clearForm();
             loadAttendances(page);
@@ -446,6 +488,7 @@ export default function AttendancePage() {
     const handleCheckoutMember = async (id: string, fullName: string) => {
         try {
             await createAttendance(id);
+            playBeep(true);
             addToast(`Salida registrada: ${fullName}`);
             loadAttendances(page);
         } catch {
@@ -503,24 +546,6 @@ export default function AttendancePage() {
             } />
 
             <div className="attendance-content" style={s.content}>
-                {/* Summary cards */}
-                <div className="summary-card" style={s.summaryCard}>
-                    <div style={s.summaryItem}>
-                        <p style={s.summaryLabel}>Entradas hoy</p>
-                        <p className="summary-value" style={s.summaryValue}>{attendances.length}</p>
-                    </div>
-                    <div style={s.summaryDivider} />
-                    <div style={s.summaryItem}>
-                        <p style={s.summaryLabel}>Total registros</p>
-                        <p className="summary-value" style={s.summaryValue}>{total}</p>
-                    </div>
-                    <div style={s.summaryDivider} />
-                    <div style={s.summaryItem}>
-                        <p style={s.summaryLabel}>Miembros activos</p>
-                        <p className="summary-value" style={s.summaryValue}>{activeMembersList.length}</p>
-                    </div>
-                </div>
-
                 {scanning && (
                     <div style={s.card}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -574,6 +599,24 @@ export default function AttendancePage() {
                         </button>
                     </div>
                 </div>
+                </div>
+
+                {/* Summary cards */}
+                <div className="summary-card" style={s.summaryCard}>
+                    <div style={s.summaryItem}>
+                        <p style={s.summaryLabel}>Entradas hoy</p>
+                        <p className="summary-value" style={s.summaryValue}>{attendances.length}</p>
+                    </div>
+                    <div style={s.summaryDivider} />
+                    <div style={s.summaryItem}>
+                        <p style={s.summaryLabel}>Total registros</p>
+                        <p className="summary-value" style={s.summaryValue}>{total}</p>
+                    </div>
+                    <div style={s.summaryDivider} />
+                    <div style={s.summaryItem}>
+                        <p style={s.summaryLabel}>Miembros activos</p>
+                        <p className="summary-value" style={s.summaryValue}>{activeMembersList.length}</p>
+                    </div>
                 </div>
 
                 {/* Attendance table */}
@@ -707,7 +750,7 @@ const s: Record<string, React.CSSProperties> = {
     btnGhost:       { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     reportPeriods:  { display: "flex", gap: 6, padding: "12px 20px", borderBottom: "1px solid #F0F0EE" },
     reportPeriodBtn: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontFamily: "inherit", cursor: "pointer", color: "#555" },
-    reportPeriodActive: { background: "#1a1a1a", borderColor: "#1a1a1a", color: "#fff" },
+    reportPeriodActive: { background: "#1a1a1a", border: "1px solid #1a1a1a", color: "#fff" },
     reportModal:    { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 1200, width: 560, maxWidth: "90vw", background: "#fff", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", maxHeight: "80vh" },
     reportHeader:   { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
     reportTitle:    { fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 },

@@ -24,7 +24,6 @@ const NAV_ITEMS: NavItem[] = [
     { to: "/plans",        icon: "ti-clipboard-list",   label: "Planes",        roles: ["admin"] },
     { to: "/subscriptions",icon: "ti-id-badge",         label: "Suscripciones", roles: ["admin", "receptionist"] },
     { to: "/payments",     icon: "ti-credit-card",      label: "Pagos",         roles: ["admin", "receptionist"] },
-    { to: "/expenses",    icon: "ti-receipt",          label: "Gastos",         roles: ["admin"] },
     { to: "/attendance",   icon: "ti-scan",             label: "Asistencia",    roles: ["admin", "receptionist", "trainer"] },
     { to: "/classes",      icon: "ti-calendar",         label: "Clases",        roles: ["admin", "receptionist", "trainer"] },
     { to: "/users",        icon: "ti-shield-lock",      label: "Usuarios",      roles: ["admin"] },

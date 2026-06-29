@@ -11,7 +11,6 @@ import ClassesPage from "../pages/ClassesPage";
 import SubscriptionsPage from "../pages/SubscriptionsPage";
 import AttendancePage from "../pages/AttendancePage";
 import PaymentsPage from "../pages/PaymentsPage";
-import ExpensesPage from "../pages/ExpensesPage";
 import UsersPage from "../pages/UsersPage";
 import ProfilePage from "../pages/ProfilePage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
@@ -77,12 +76,6 @@ export default function AppRouter() {
                         <Route path="/payments" element={
                             <ProtectedRoute allowedRoles={["admin", "receptionist"]}>
                                 <PaymentsPage />
-                            </ProtectedRoute>
-                        } />
-
-                        <Route path="/expenses" element={
-                            <ProtectedRoute allowedRoles={["admin"]}>
-                                <ExpensesPage />
                             </ProtectedRoute>
                         } />
 

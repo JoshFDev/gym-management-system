@@ -41,7 +41,7 @@ const attStatusStyle: Record<string, React.CSSProperties> = {
     checked_out: { background: "#F0F0EE", color: "#888" },
 };
 
-const downloadQR = (memberId: string, name: string) => {
+const downloadQR = (name: string) => {
     const svg = document.getElementById("profile-qr") as SVGElement | null;
     if (!svg) return;
     const serializer = new XMLSerializer();
@@ -150,7 +150,7 @@ export default function MemberProfilePage() {
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 0" }}>
                             <QRCodeSVG id="profile-qr" value={member.id} size={160} level="M" />
                             <p style={s.qrHint}>Escanea para registrar entrada</p>
-                            <button style={s.downloadBtn} onClick={() => downloadQR(member.id, `${member.firstName}_${member.lastName}`)}>
+                            <button style={s.downloadBtn} onClick={() => downloadQR(`${member.firstName}_${member.lastName}`)}>
                                 <i className="ti ti-download" style={{ fontSize: 13 }} aria-hidden />
                                 Descargar QR
                             </button>
