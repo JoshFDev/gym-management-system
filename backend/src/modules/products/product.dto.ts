@@ -7,6 +7,7 @@ export interface ProductResponse {
     price: number;
     stock: number;
     category: string;
+    image?: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -19,6 +20,7 @@ export const toProductResponse = (product: IProduct): ProductResponse => ({
     price: product.price,
     stock: product.stock,
     category: product.category,
+    image: product.image,
     status: product.status,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,

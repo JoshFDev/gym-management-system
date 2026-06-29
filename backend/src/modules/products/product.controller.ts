@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import path from "path";
+import fs from "fs";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
 import { createProduct, getProducts, getProductById, updateProduct, deactivateProduct, reactivateProduct, getCategories } from "./product.service";
 import { toProductResponse } from "./product.dto";
@@ -106,4 +108,25 @@ export const reactivate = asyncHandler(async (req: AuthRequest, res: Response) =
 export const categories = asyncHandler(async (_req: Request, res: Response) => {
     const cats = await getCategories();
     res.status(200).json({ success: true, data: cats });
+});
+
+export const uploadImage = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const product = await getProductById(req.params.id as string);
+    if (!req.file) {
+        res.status(400).json({ success: false, message: "No se envió ninguna imagen." });
+        return;
+    }
+    const imageUrl = `/uploads/products/${req.file.filename}`;
+    const updated = await updateProduct(product._id.toString(), { image: imageUrl });
+    res.status(200).json({ success: true, message: "Imagen subida exitosamente.", data: toProductResponse(updated) });
+});
+
+export const deleteImage = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const product = await getProductById(req.params.id as string);
+    if (product.image) {
+        const filePath = path.join(__dirname, "../../../../", product.image);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    const updated = await updateProduct(product._id.toString(), { image: undefined });
+    res.status(200).json({ success: true, message: "Imagen eliminada.", data: toProductResponse(updated) });
 });

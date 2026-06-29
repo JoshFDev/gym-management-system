@@ -19,7 +19,7 @@ export const getProductById = async (id: string) => {
     return product;
 };
 
-export const updateProduct = async (id: string, data: UpdateProductInput) => {
+export const updateProduct = async (id: string, data: UpdateProductInput & { image?: string }) => {
     const product = await Product.findByIdAndUpdate(id, data, { returnDocument: "after", runValidators: true });
     if (!product) throw new NotFoundError("Producto no encontrado");
     return product;

@@ -7,6 +7,7 @@ export interface Product {
     price: number;
     stock: number;
     category: string;
+    image?: string;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -61,5 +62,19 @@ export const reactivateProduct = async (id: string) => {
 
 export const getCategories = async () => {
     const res = await api.get("/products/categories");
+    return res.data;
+};
+
+export const uploadProductImage = async (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await api.post(`/products/${id}/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+};
+
+export const deleteProductImage = async (id: string) => {
+    const res = await api.delete(`/products/${id}/image`);
     return res.data;
 };
