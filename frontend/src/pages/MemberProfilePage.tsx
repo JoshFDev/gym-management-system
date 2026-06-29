@@ -71,7 +71,7 @@ export default function MemberProfilePage() {
                 const [memberRes, attRes, payRes] = await Promise.all([
                     getMemberById(id),
                     getAttendances(1, 100, { memberId: id }),
-                    getPayments(1, 100, id),
+                    getPayments(1, 100, { memberId: id }),
                 ]);
                 setMember(memberRes.data);
                 setAttendances(attRes.data ?? []);

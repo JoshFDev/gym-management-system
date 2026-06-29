@@ -300,7 +300,7 @@ export default function AttendancePage() {
     const clearFilters = () => { setFilterSearch(""); setFilterGender(""); setFilterDate(""); setFilterStatus(""); setPage(1); };
 
     const activeMembersList = members.filter((m) => m.membershipStatus === "active");
-    const checkedInCount = attendances.filter((a) => a.status === "checked_in").length;
+
 
     const { addToast } = useToast();
 
@@ -396,7 +396,6 @@ export default function AttendancePage() {
                                 ? `Salida registrada: ${member.firstName} ${member.lastName}`
                                 : `Entrada registrada: ${member.firstName} ${member.lastName}`);
                             loadRef.current(pageRef.current);
-                            loadActiveRef.current();
                         } catch {
                             addToast("Error al registrar", "error");
                         }
@@ -503,22 +502,22 @@ export default function AttendancePage() {
                 </div>
             } />
 
-            <div style={s.content}>
+            <div className="attendance-content" style={s.content}>
                 {/* Summary cards */}
-                <div style={s.summaryCard}>
+                <div className="summary-card" style={s.summaryCard}>
                     <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Entradas hoy</p>
-                        <p style={s.summaryValue}>{attendances.length}</p>
+                        <p className="summary-value" style={s.summaryValue}>{attendances.length}</p>
                     </div>
                     <div style={s.summaryDivider} />
                     <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Total registros</p>
-                        <p style={s.summaryValue}>{total}</p>
+                        <p className="summary-value" style={s.summaryValue}>{total}</p>
                     </div>
                     <div style={s.summaryDivider} />
                     <div style={s.summaryItem}>
                         <p style={s.summaryLabel}>Miembros activos</p>
-                        <p style={s.summaryValue}>{activeMembersList.length}</p>
+                        <p className="summary-value" style={s.summaryValue}>{activeMembersList.length}</p>
                     </div>
                 </div>
 
@@ -636,17 +635,30 @@ export default function AttendancePage() {
     @media (max-width: 768px) {
         .table-scroll table { min-width: 600px; }
     }
+    @media (max-width: 1100px) {
+        .attendance-content { gap: 10px !important; }
+    }
     @media (max-width: 900px) {
-        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
         .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
         .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
         .filter-group { width: 100% !important; }
+        .toolbar-card { padding: 8px 10px !important; }
     }
     @media (max-width: 600px) {
         .filter-group { flex-direction: column !important; }
         .filter-group > * { width: 100% !important; }
         .export-group { justify-content: stretch !important; }
         .export-group > * { flex: 1 !important; }
+        .toolbar-card { padding: 6px 8px !important; }
+        .attendance-content { padding: 8px 10px !important; gap: 8px !important; }
+        .summary-card { padding: 10px 12px !important; gap: 12px !important; }
+        .summary-value { font-size: 18px !important; }
+    }
+    @media (max-width: 480px) {
+        .attendance-content { padding: 6px 6px !important; gap: 6px !important; }
+        .summary-card { padding: 8px 10px !important; gap: 8px !important; }
+        .summary-value { font-size: 16px !important; }
     }
 `}</style>
         </div>
@@ -655,8 +667,8 @@ export default function AttendancePage() {
 
 const s: Record<string, React.CSSProperties> = {
     page:           { display: "flex", flexDirection: "column", minHeight: "100%" },
-    content:        { padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 },
-    summaryCard:    { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "16px 24px", display: "flex", alignItems: "center", gap: 24 },
+    content:        { padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 },
+    summaryCard:    { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 20 },
     summaryItem:    { display: "flex", flexDirection: "column", gap: 4 },
     summaryLabel:   { fontSize: 11, color: "#bbb", fontWeight: 500, margin: 0 },
     summaryValue:   { fontSize: 22, fontWeight: 600, color: "#1a1a1a", letterSpacing: -0.5, margin: 0 },
@@ -685,8 +697,8 @@ const s: Record<string, React.CSSProperties> = {
     input:          { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const },
     timePreview:    { display: "flex", alignItems: "center", gap: 6, marginTop: 10, padding: "8px 12px", background: "#F7F7F6", borderRadius: 6, width: "fit-content" },
     btnIcon:        { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
-    toolbar:        { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
-    toolbarCard:     { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    toolbar:        { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const },
+    toolbarCard:     { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "10px 14px", borderTop: "2px solid #D4AF37" },
     filterGroup:     { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
     exportGroup:     { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
     filterSelect:   { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#555", fontFamily: "inherit", cursor: "pointer", outline: "none" },
@@ -703,9 +715,9 @@ const s: Record<string, React.CSSProperties> = {
     reportBody:     { flex: 1, overflowY: "auto", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 },
     reportFooter:   { display: "flex", gap: 8, justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid #F0F0EE", flexShrink: 0 },
     searchWrap:     { position: "relative", display: "flex", alignItems: "center", flex: "0 0 340px" },
-    searchIcon:     { position: "absolute", left: 12, fontSize: 15, color: "#bbb", pointerEvents: "none" },
-    searchInput:    { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 30px 9px 34px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
-    clearBtn:       { position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 2, display: "flex", alignItems: "center" },
+    searchIcon:     { position: "absolute", left: 10, fontSize: 14, color: "#bbb", pointerEvents: "none" },
+    searchInput:    { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "7px 28px 7px 32px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
+    clearBtn:       { position: "absolute", right: 6, background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 2, display: "flex", alignItems: "center" },
     btnDanger:      { display: "inline-flex", alignItems: "center", gap: 6, background: "#fff", color: "#c0392b", border: "1px solid #fecaca", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.1s" },
     btnCheckoutRow: { display: "inline-flex", alignItems: "center", gap: 4, background: "none", color: "#c0392b", border: "1px solid #fecaca", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.1s" },
 };

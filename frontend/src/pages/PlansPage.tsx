@@ -20,14 +20,6 @@ interface Plan {
 
 interface FormErrors { name?: string; price?: string; durationDays?: string; }
 
-const statusStyle = (status: string): React.CSSProperties => {
-    const map: Record<string, React.CSSProperties> = {
-        active: { background: "#F0F7F1", color: "#3a7d44" },
-        inactive: { background: "#F0F0EE", color: "#888" },
-    };
-    return map[status] ?? { background: "#F0F0EE", color: "#888" };
-};
-
 const statusLabel: Record<string, string> = {
     active: "Activo", inactive: "Inactivo",
 };
@@ -193,7 +185,7 @@ export default function PlansPage() {
     const isDeactivating = confirmTarget?.status === "active";
 
     return (
-        <div style={s.page}>
+        <div className="plans-page" style={s.page}>
             <ConfirmModal open={confirmOpen} title={isDeactivating ? "Desactivar plan" : "Activar plan"}
                 body={isDeactivating ? `El plan "${confirmTarget?.name}" dejará de estar disponible para nuevas suscripciones.` : `El plan "${confirmTarget?.name}" volverá a estar disponible.`}
                 confirmLabel={isDeactivating ? "Sí, desactivar" : "Sí, activar"} confirmColor={isDeactivating ? "#c0392b" : "#3a7d44"}
@@ -201,16 +193,16 @@ export default function PlansPage() {
             <PlanDrawer open={drawerOpen} editingId={editingId} saving={saving} values={formValues} errors={errors} touched={touched}
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Planes" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo plan</GymButton>} />
-            <div className="toolbar-card" style={s.toolbarCard}>
-            <div className="toolbar-wrap" style={s.toolbar}>
-                <div style={s.searchWrap}>
-                    <i className="ti ti-search" style={s.searchIcon} aria-hidden />
-                    <input style={s.searchInput} placeholder="Buscar plan…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                    {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+            <div className="plans-content" style={s.content}>
+                <div className="toolbar-card" style={s.toolbarCard}>
+                <div className="toolbar-wrap" style={s.toolbar}>
+                    <div style={s.searchWrap}>
+                        <i className="ti ti-search" style={s.searchIcon} aria-hidden />
+                        <input style={s.searchInput} placeholder="Buscar plan…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                    </div>
                 </div>
-            </div>
-            </div>
-            <div style={s.content}>
+                </div>
                 {error ? (
                     <div style={{ textAlign: "center", padding: 40 }}>
                         <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
@@ -227,28 +219,38 @@ export default function PlansPage() {
                     <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
-                                <th style={s.th}>Nombre</th><th style={s.th}>Descripción</th><th style={s.th}>Precio</th>
+                                <th style={{ ...s.th, paddingLeft: 16 }}>Nombre</th><th style={s.th}>Descripción</th><th style={s.th}>Precio</th>
                                 <th style={s.th}>Duración</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
                             </tr></thead>
-                            <tbody>{plans.map((p) => (
-                                <tr key={p.id} style={s.row}>
-                                    <td style={{ ...s.td, fontWeight: 500 }}>{p.name}</td>
+                            <tbody>{plans.map((p) => {
+                                const isActive = p.status === "active";
+                                return (
+                                <tr key={p.id} style={s.row} className="plan-row">
+                                    <td style={{ ...s.td, paddingLeft: 16, fontWeight: 500 }}>{p.name}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{p.description ?? "—"}</td>
                                     <td style={s.td}>${p.price}</td>
                                     <td style={{ ...s.td, ...s.muted }}>{p.durationDays} días</td>
-                                    <td style={s.td}><span style={{ ...s.badge, ...statusStyle(p.status) }}>{statusLabel[p.status] ?? p.status}</span></td>
                                     <td style={s.td}>
-                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                            <button style={s.btnAction} onClick={() => openEdit(p)}><i className="ti ti-edit" style={{ fontSize: 13 }} aria-hidden />Editar</button>
-                                            <button style={{ ...s.btnAction, color: p.status === "active" ? "#c0392b" : "#3a7d44", borderColor: p.status === "active" ? "#fecaca" : "#bbf7d0" }}
-                                                onClick={() => requestToggle(p)}>
-                                                <i className={`ti ${p.status === "active" ? "ti-toggle-left" : "ti-toggle-right"}`} style={{ fontSize: 13 }} aria-hidden />
-                                                {p.status === "active" ? "Desactivar" : "Activar"}
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, background: isActive ? "#F0F7F1" : "#F5F5F4", color: isActive ? "#3a7d44" : "#999" }}>
+                                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: isActive ? "#3a7d44" : "#ccc" }} />
+                                            {statusLabel[p.status] ?? p.status}
+                                        </span>
+                                    </td>
+                                    <td style={s.td}>
+                                        <div className="actions-group" style={{ display: "flex", gap: 4 }}>
+                                            <button className="btn-icon-action" style={s.btnIconAction} onClick={() => openEdit(p)} title="Editar">
+                                                <i className="ti ti-edit" style={{ fontSize: 14 }} aria-hidden />
+                                            </button>
+                                            <button className="btn-icon-action" style={{ ...s.btnIconAction, color: isActive ? "#c0392b" : "#3a7d44" }}
+                                                onClick={() => requestToggle(p)}
+                                                title={isActive ? "Desactivar" : "Activar"}>
+                                                <i className={`ti ${isActive ? "ti-toggle-left" : "ti-toggle-right"}`} style={{ fontSize: 14 }} aria-hidden />
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
-                            ))}</tbody>
+                                );
+                            })}</tbody>
                         </table>
                     </div>
                 )}
@@ -256,21 +258,31 @@ export default function PlansPage() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
             <style>{`
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .plan-row { cursor: default; transition: background 0.1s ease; }
+    .plan-row:hover { background: #FAFAFA; }
+    .plan-row:last-child td { border-bottom: none !important; }
+    .actions-group { opacity: 0.4; transition: opacity 0.15s; }
+    .plan-row:hover .actions-group { opacity: 1; }
+    .btn-icon-action:hover { background: #F0F0EE !important; border-color: #E5E4E2 !important; color: #1a1a1a !important; }
     @media (max-width: 768px) {
         .table-scroll table { min-width: 550px; }
         .drawer-panel { width: 100vw !important; border-left: none !important; }
     }
     @media (max-width: 900px) {
-        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .plans-page > div:first-child { padding: 14px 20px 12px !important; }
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
         .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
-        .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
-        .filter-group { width: 100% !important; }
+        .toolbar-card { padding: 5px 8px !important; }
+        .plans-content { padding: 6px 14px 20px !important; gap: 6px !important; }
     }
     @media (max-width: 600px) {
-        .filter-group { flex-direction: column !important; }
-        .filter-group > * { width: 100% !important; }
-        .export-group { justify-content: stretch !important; }
-        .export-group > * { flex: 1 !important; }
+        .plans-page > div:first-child { padding: 10px 14px 8px !important; }
+        .toolbar-card { padding: 4px 6px !important; }
+        .plans-content { padding: 4px 10px 16px !important; gap: 4px !important; }
+    }
+    @media (max-width: 480px) {
+        .plans-page > div:first-child { padding: 8px 10px 6px !important; }
+        .plans-content { padding: 4px 8px 12px !important; gap: 4px !important; }
     }
 `}</style>
         </div>
@@ -279,7 +291,7 @@ export default function PlansPage() {
 
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%", position: "relative" },
-    content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
+    content: { padding: "8px 24px 24px", display: "flex", flexDirection: "column", gap: 8 },
     overlay: { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s ease" },
     drawer: { position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 900, width: 420, background: "#fff", borderLeft: "1px solid #E5E4E2", display: "flex", flexDirection: "column", transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)", boxShadow: "-4px 0 24px rgba(0,0,0,0.08)" },
     drawerHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 18px", borderBottom: "1px solid #F0F0EE", flexShrink: 0 },
@@ -295,22 +307,20 @@ const s: Record<string, React.CSSProperties> = {
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
     btnAction: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 13px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
+    btnIconAction: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", color: "#888", border: "1px solid transparent", borderRadius: 6, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
     card: { background: "#fff", border: "1px solid #E5E4E2", borderTop: "2px solid #D4AF37", borderRadius: 8, overflow: "hidden" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
-    th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
+    th: { padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
+    td: { padding: "10px 12px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
-    badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
-    searchWrap: { position: "relative", display: "flex", alignItems: "center", flex: "0 0 340px" },
-    searchIcon: { position: "absolute", left: 12, fontSize: 15, color: "#bbb", pointerEvents: "none" },
-    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 30px 9px 34px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit" },
-    clearBtn: { background: "none", border: "none", position: "absolute", right: 8, cursor: "pointer", color: "#bbb", display: "flex", alignItems: "center", padding: 2, borderRadius: 4 },
-    toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
-    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
-    filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
-    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    searchWrap: { position: "relative", display: "flex", alignItems: "center", width: "100%" },
+    searchIcon: { position: "absolute", left: 10, fontSize: 13, color: "#bbb", pointerEvents: "none" },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 8, padding: "6px 26px 6px 30px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", maxWidth: 825, fontFamily: "inherit" },
+    clearBtn: { background: "none", border: "none", position: "absolute", right: 6, cursor: "pointer", color: "#bbb", display: "flex", alignItems: "center", padding: 2, borderRadius: 4 },
+    toolbar: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "6px 14px", borderTop: "2px solid #D4AF37" },
 };

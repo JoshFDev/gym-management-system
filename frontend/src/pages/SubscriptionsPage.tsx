@@ -29,16 +29,6 @@ interface Plan { id: string; name: string; price: number; durationDays: number; 
 
 interface FormErrors { memberId?: string; planId?: string; }
 
-const statusStyle = (status: string): React.CSSProperties => {
-    const map: Record<string, React.CSSProperties> = {
-        active: { background: "#F0F7F1", color: "#3a7d44" },
-        expired: { background: "#FFF4F0", color: "#c0392b" },
-        pending: { background: "#FFFBF0", color: "#b7791f" },
-        cancelled: { background: "#F0F0EE", color: "#888" },
-    };
-    return map[status] ?? { background: "#F0F0EE", color: "#888" };
-};
-
 const statusLabel: Record<string, string> = {
     active: "Activo", expired: "Vencido", pending: "Pendiente", cancelled: "Cancelada",
 };
@@ -307,7 +297,7 @@ export default function SubscriptionsPage() {
     };
 
     return (
-        <div style={s.page}>
+        <div className="subs-page" style={s.page}>
 
             <ConfirmModal open={confirmOpen} title="Renovar suscripción"
                 body="¿Renovar esta suscripción? Se extenderá la fecha de vencimiento según los días del plan."
@@ -325,20 +315,23 @@ export default function SubscriptionsPage() {
                 members={members} plans={plans} onChange={handleFieldChange} onBlur={handleBlur}
                 onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Suscripciones" action={<GymButton icon="ti-plus" onClick={openNew}>Nueva suscripción</GymButton>} />
-            <div style={s.content}>
+            <div className="subs-content" style={s.content}>
                 <div className="toolbar-card" style={s.toolbarCard}>
                 <div className="toolbar-wrap" style={s.toolbar}>
-                    <input placeholder="Buscar miembro…" value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        style={{ ...s.input, maxWidth: 200 }} />
+                    <div style={s.searchWrap}>
+                        <i className="ti ti-search" style={s.searchIcon} aria-hidden />
+                        <input style={s.searchInput} placeholder="Buscar miembro…" value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+                        {search && <button style={s.clearBtn} onClick={() => { setSearch(""); setPage(1); }}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                    </div>
                     <div className="filter-group" style={s.filterGroup}>
-                        <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }} style={{ ...s.input, maxWidth: 160 }}>
+                        <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }} style={s.filterSelect}>
                             <option value="">Todos los planes</option>
                             {plans.filter((p: Plan) => p.status === "active").map((p: Plan) => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                         </select>
-                        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} style={{ ...s.input, maxWidth: 140 }}>
+                        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} style={s.filterSelect}>
                             <option value="">Todos los estados</option>
                             <option value="active">Activa</option>
                             <option value="expired">Vencida</option>
@@ -369,44 +362,64 @@ export default function SubscriptionsPage() {
                     <div style={{ ...s.card, padding: 0 }} className="table-scroll">
                         <table style={s.table}>
                             <thead><tr style={s.thead}>
-                                <th style={s.th}>Miembro</th><th style={s.th}>Plan</th><th style={s.th}>Precio</th>
+                                <th style={{ ...s.th, paddingLeft: 16 }}>Miembro</th><th style={s.th}>Plan</th><th style={s.th}>Precio</th>
                                 <th style={s.th}>Inicio</th><th style={s.th}>Vencimiento</th>
-                                <th style={s.th}>Días restantes</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
+                                <th style={s.th}>Días rest.</th><th style={s.th}>Estado</th><th style={s.th}>Acciones</th>
                             </tr></thead>
                             <tbody>{subscriptions.map((sub) => {
                                 const days = daysLeft(sub.endDate);
+                                const stat = sub.status;
+                                const isActive = stat === "active";
+                                const isCancelled = stat === "cancelled";
+                                const isExpired = stat === "expired";
+                                const daysColor = isExpired ? "#c0392b" : days <= 5 ? "#c0392b" : days <= 15 ? "#b7791f" : "#3a7d44";
                                 return (
-                                    <tr key={sub.id} style={s.row}>
-                                        <td style={s.td}>
-                                            <p style={{ fontWeight: 500, margin: 0, fontSize: 13, color: "#1a1a1a" }}>{sub.member?.fullName ?? "—"}</p>
-                                            <p style={{ fontSize: 11, color: "#bbb", margin: 0 }}>{sub.member?.email ?? sub.member?.phone ?? ""}</p>
+                                    <tr key={sub.id} style={s.row} className="sub-row">
+                                        <td style={{ ...s.td, paddingLeft: 16 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <div style={{ ...s.avatar, background: isActive ? "#F0F7F1" : isExpired ? "#FFF4F0" : "#F0F0EE", color: isActive ? "#3a7d44" : isExpired ? "#c0392b" : "#999" }}>
+                                                    {sub.member?.fullName?.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() ?? "—"}
+                                                </div>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{sub.member?.fullName ?? "—"}</p>
+                                                    {sub.member?.email && <p style={{ margin: 0, fontSize: 11, color: "#bbb" }}>{sub.member.email}</p>}
+                                                </div>
+                                            </div>
                                         </td>
                                         <td style={{ ...s.td, fontWeight: 500 }}>{sub.plan?.name ?? "—"}</td>
                                         <td style={{ ...s.td, ...s.muted }}>${sub.plan?.price ?? 0}</td>
                                         <td style={{ ...s.td, ...s.muted }}>{fmtDate(sub.startDate)}</td>
                                         <td style={{ ...s.td, ...s.muted }}>{fmtDate(sub.endDate)}</td>
                                         <td style={s.td}>
-                                            <span style={{ fontSize: 12, fontWeight: 500, color: days <= 5 ? "#c0392b" : days <= 15 ? "#b7791f" : "#3a7d44" }}>
-                                                {sub.status === "expired" ? "Vencida" : days <= 0 ? "Hoy" : `${days} días`}
+                                            <span style={{ fontSize: 12, fontWeight: 500, color: daysColor }}>
+                                                {isExpired ? "Vencida" : days <= 0 ? "Hoy" : `${days} días`}
                                             </span>
                                         </td>
-                                        <td style={s.td}><span style={{ ...s.badge, ...statusStyle(sub.status) }}>{statusLabel[sub.status] ?? sub.status}</span></td>
                                         <td style={s.td}>
-                                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                                {sub.status === "cancelled" ? (
-                                                    <button style={{ ...s.btnAction, color: "#c0392b" }}
-                                                        onClick={() => requestDelete(sub.id)}>
-                                                        <i className="ti ti-trash" style={{ fontSize: 13 }} aria-hidden />Eliminar
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500,
+                                                background: isActive ? "#F0F7F1" : isExpired ? "#FFF4F0" : stat === "cancelled" ? "#F5F5F4" : "#FFFBF0",
+                                                color: isActive ? "#3a7d44" : isExpired ? "#c0392b" : stat === "cancelled" ? "#999" : "#b7791f" }}>
+                                                <span style={{ width: 6, height: 6, borderRadius: "50%",
+                                                    background: isActive ? "#3a7d44" : isExpired ? "#c0392b" : stat === "cancelled" ? "#ccc" : "#b7791f" }} />
+                                                {statusLabel[stat] ?? stat}
+                                            </span>
+                                        </td>
+                                        <td style={s.td}>
+                                            <div className="actions-group" style={{ display: "flex", gap: 4 }}>
+                                                {isCancelled ? (
+                                                    <button className="btn-icon-action" style={{ ...s.btnIconAction, color: "#c0392b" }}
+                                                        onClick={() => requestDelete(sub.id)} title="Eliminar">
+                                                        <i className="ti ti-trash" style={{ fontSize: 14 }} aria-hidden />
                                                     </button>
                                                 ) : (
                                                     <>
-                                                        <button style={{ ...s.btnAction, opacity: sub.status === "active" ? 0.4 : 1, cursor: sub.status === "active" ? "not-allowed" : "pointer" }}
-                                                            onClick={() => requestRenew(sub.id)} disabled={sub.status === "active"}>
-                                                            <i className="ti ti-refresh" style={{ fontSize: 13 }} aria-hidden />Renovar
+                                                        <button className="btn-icon-action" style={{ ...s.btnIconAction, opacity: isActive ? 0.4 : 1 }}
+                                                            onClick={() => requestRenew(sub.id)} disabled={isActive} title="Renovar">
+                                                            <i className="ti ti-refresh" style={{ fontSize: 14 }} aria-hidden />
                                                         </button>
-                                                        <button style={{ ...s.btnAction, color: "#c0392b", opacity: sub.status === "cancelled" ? 0.4 : 1, cursor: sub.status === "cancelled" ? "not-allowed" : "pointer" }}
-                                                            onClick={() => requestCancel(sub.id)} disabled={sub.status === "cancelled"}>
-                                                            <i className="ti ti-x" style={{ fontSize: 13 }} aria-hidden />Cancelar
+                                                        <button className="btn-icon-action" style={{ ...s.btnIconAction, color: "#c0392b" }}
+                                                            onClick={() => requestCancel(sub.id)} title="Cancelar">
+                                                            <i className="ti ti-x" style={{ fontSize: 14 }} aria-hidden />
                                                         </button>
                                                     </>
                                                 )}
@@ -426,20 +439,36 @@ export default function SubscriptionsPage() {
             <style>{`
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .table-scroll table { min-width: 700px; }
+    .sub-row { transition: background 0.1s ease; }
+    .sub-row:hover { background: #FAFAFA; }
+    .sub-row:last-child td { border-bottom: none !important; }
+    .actions-group { opacity: 0.4; transition: opacity 0.15s; }
+    .sub-row:hover .actions-group { opacity: 1; }
+    .btn-icon-action:hover { background: #F0F0EE !important; border-color: #E5E4E2 !important; color: #1a1a1a !important; }
     @media (max-width: 768px) {
         .drawer-panel { width: 100vw !important; border-left: none !important; }
     }
     @media (max-width: 900px) {
-        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+        .subs-page > div:first-child { padding: 14px 20px 12px !important; }
+        .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
         .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
         .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
         .filter-group { width: 100% !important; }
+        .toolbar-card { padding: 8px 10px !important; }
+        .subs-content { padding: 6px 14px 20px !important; gap: 6px !important; }
     }
     @media (max-width: 600px) {
+        .subs-page > div:first-child { padding: 10px 14px 8px !important; }
         .filter-group { flex-direction: column !important; }
         .filter-group > * { width: 100% !important; }
         .export-group { justify-content: stretch !important; }
         .export-group > * { flex: 1 !important; }
+        .toolbar-card { padding: 6px 8px !important; }
+        .subs-content { padding: 4px 10px 16px !important; gap: 4px !important; }
+    }
+    @media (max-width: 480px) {
+        .subs-page > div:first-child { padding: 8px 10px 6px !important; }
+        .subs-content { padding: 4px 8px 12px !important; gap: 4px !important; }
     }
 `}</style>
         </div>
@@ -469,20 +498,26 @@ const s: Record<string, React.CSSProperties> = {
     btnGhost: { background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" },
     btnConfirm: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", minWidth: 110 },
     btnIcon: { background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" },
+    btnIconAction: { background: "none", border: "1px solid transparent", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
     btnAction: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", color: "#555", border: "1px solid #E5E4E2", borderRadius: 6, padding: "8px 13px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
     exportBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 14px", fontSize: 13, fontWeight: 500, color: "#555", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" as const },
     spinner: { display: "inline-block", width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
     card: { background: "#fff", border: "1px solid #E5E4E2", borderTop: "2px solid #D4AF37", borderRadius: 8, overflow: "hidden" },
     table: { width: "100%", borderCollapse: "collapse" },
     thead: { borderBottom: "1px solid #E5E4E2", background: "#FAFAFA" },
-    th: { padding: "10px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
+    th: { padding: "12px 14px", fontSize: 11, fontWeight: 500, color: "#bbb", textAlign: "left", whiteSpace: "nowrap" },
     row: { borderBottom: "1px solid #F0F0EE" },
-    td: { padding: "11px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
+    td: { padding: "12px 14px", fontSize: 13, color: "#1a1a1a", verticalAlign: "middle" },
     muted: { color: "#888", fontSize: 12 },
-    badge: { display: "inline-flex", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500 },
+    avatar: { width: 34, height: 34, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 },
     empty: { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
-    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
+    toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 14px", borderTop: "2px solid #D4AF37" },
     filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
     exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    searchWrap: { position: "relative", flex: "1 1 160px", maxWidth: 700 } as React.CSSProperties,
+    searchIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "#bbb", pointerEvents: "none" as const },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 26px 7px 30px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, transition: "border-color 0.15s" },
+    clearBtn: { position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 24px 7px 10px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", cursor: "pointer", appearance: "none" as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", minWidth: 130 },
 };
