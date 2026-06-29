@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
     { to: "/payments",     icon: "ti-credit-card",      label: "Pagos",         roles: ["admin", "receptionist"] },
     { to: "/attendance",   icon: "ti-scan",             label: "Asistencia",    roles: ["admin", "receptionist", "trainer"] },
     { to: "/classes",      icon: "ti-calendar",         label: "Clases",        roles: ["admin", "receptionist", "trainer"] },
+    { to: "/store",        icon: "ti-building-store",   label: "Tienda",        roles: ["admin", "receptionist"] },
     { to: "/users",        icon: "ti-shield-lock",      label: "Usuarios",      roles: ["admin"] },
     { to: "/audit-log",    icon: "ti-history",          label: "Auditoría",     roles: ["admin"] },
 ];

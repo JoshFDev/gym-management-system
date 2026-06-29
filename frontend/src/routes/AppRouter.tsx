@@ -11,6 +11,7 @@ import ClassesPage from "../pages/ClassesPage";
 import SubscriptionsPage from "../pages/SubscriptionsPage";
 import AttendancePage from "../pages/AttendancePage";
 import PaymentsPage from "../pages/PaymentsPage";
+import StorePage from "../pages/StorePage";
 import UsersPage from "../pages/UsersPage";
 import ProfilePage from "../pages/ProfilePage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
@@ -82,6 +83,12 @@ export default function AppRouter() {
                         <Route path="/attendance" element={
                             <ProtectedRoute allowedRoles={["admin", "receptionist", "trainer"]}>
                                 <AttendancePage />
+                            </ProtectedRoute>
+                        } />
+
+                        <Route path="/store" element={
+                            <ProtectedRoute allowedRoles={["admin", "receptionist"]}>
+                                <StorePage />
                             </ProtectedRoute>
                         } />
 
