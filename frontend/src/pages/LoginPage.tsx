@@ -28,6 +28,34 @@ function playSuccessSound() {
     } catch { /* audio not supported */ }
 }
 
+function playForgotSound() {
+    try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (ctx.state === "suspended") ctx.resume();
+        const t = ctx.currentTime;
+        const g = ctx.createGain();
+        g.connect(ctx.destination);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.15, t + 0.03);
+        g.gain.setValueAtTime(0.15, t + 0.25);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+
+        const o1 = ctx.createOscillator();
+        o1.type = "sine";
+        o1.frequency.value = 784;
+        o1.connect(g);
+        o1.start(t);
+        o1.stop(t + 0.25);
+
+        const o2 = ctx.createOscillator();
+        o2.type = "sine";
+        o2.frequency.value = 659;
+        o2.connect(g);
+        o2.start(t + 0.2);
+        o2.stop(t + 0.55);
+    } catch { /* audio not supported */ }
+}
+
 function playErrorSound() {
     try {
         const ctx = new AudioContext();
@@ -90,10 +118,11 @@ export default function LoginPage() {
         setForgotError("");
         try {
             await api.post("/auth/forgot-password", { email: forgotEmail });
-            setForgotSent(true);
         } catch {
-            setForgotSent(true);
+            // always show sent screen
         } finally {
+            playForgotSound();
+            setForgotSent(true);
             setForgotLoading(false);
         }
     };
