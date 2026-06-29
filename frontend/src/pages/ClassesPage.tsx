@@ -57,6 +57,8 @@ export default function ClassesPage() {
 
     const [filterStatus, setFilterStatus] = useState<string>("all");
     const [filterTrainer, setFilterTrainer] = useState<string>("");
+    const [filterDay, setFilterDay] = useState<number | null>(null);
+    const [search, setSearch] = useState("");
 
     const { addToast } = useToast();
 
@@ -92,9 +94,11 @@ export default function ClassesPage() {
             if (filterStatus === "active" && c.status !== "active") return false;
             if (filterStatus === "inactive" && c.status !== "inactive") return false;
             if (filterTrainer && c.trainer !== filterTrainer) return false;
+            if (filterDay !== null && (c.dayOfWeekStart > filterDay || c.dayOfWeekEnd < filterDay)) return false;
+            if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
             return true;
         });
-    }, [classes, filterStatus, filterTrainer]);
+    }, [classes, filterStatus, filterTrainer, filterDay, search]);
 
     const openNew = () => {
         setEditingId(null); setForm(emptyForm); setErrors({}); setTouched({}); setDrawerOpen(true);
@@ -202,18 +206,26 @@ export default function ClassesPage() {
     };
 
     return (
-        <div style={s.page}>
+        <div className="classes-page" style={s.page}>
             <PageHeader title="Clases" subtitle="Horarios y gestión de clases" action={<GymButton icon="ti-plus" onClick={openNew}>Nueva clase</GymButton>} />
+
+            <div className="classes-content" style={s.content}>
 
             <div className="toolbar-card" style={s.toolbarCard}>
             <div className="toolbar-wrap" style={s.toolbar}>
+                <div className="search-wrap" style={s.searchWrap}>
+                    <i className="ti ti-search" style={s.searchIcon} aria-hidden />
+                    <input style={s.searchInput} placeholder="Buscar clase…" value={search}
+                        onChange={(e) => setSearch(e.target.value)} />
+                    {search && <button style={s.clearBtn} onClick={() => setSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                </div>
                 <div className="filter-group" style={s.filterGroup}>
-                    <select style={s.filterInput} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <select style={s.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                         <option value="all">Todas</option>
                         <option value="active">Activas</option>
                         <option value="inactive">Inactivas</option>
                     </select>
-                    <select style={s.filterInput} value={filterTrainer} onChange={(e) => setFilterTrainer(e.target.value)}>
+                    <select style={s.filterSelect} value={filterTrainer} onChange={(e) => setFilterTrainer(e.target.value)}>
                         <option value="">Todos los entrenadores</option>
                         {trainers.map((t) => (
                             <option key={t.id} value={`${t.firstName} ${t.lastName}`}>{t.firstName} {t.lastName}</option>
@@ -221,9 +233,26 @@ export default function ClassesPage() {
                     </select>
                 </div>
             </div>
+            {/* Day filter pills */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", padding: "4px 0 0" }}>
+                {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((lbl, i) => (
+                    <button key={i} onClick={() => setFilterDay(filterDay === i ? null : i)}
+                        style={{
+                            ...s.dayPill,
+                            background: filterDay === i ? "#1a1a1a" : "#F7F7F6",
+                            color: filterDay === i ? "#fff" : "#888",
+                        }}>
+                        {lbl}
+                    </button>
+                ))}
+                {filterDay !== null && (
+                    <button onClick={() => setFilterDay(null)} style={{ ...s.dayPill, background: "none", color: "#c0392b", border: "none" }}>
+                        <i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden />
+                    </button>
+                )}
+            </div>
             </div>
 
-            <div style={s.content}>
                 {error ? (
                     <div style={{ textAlign: "center", padding: 40 }}>
                         <p style={{ fontSize: 13, color: "#c0392b", marginBottom: 12 }}>Error al cargar datos.</p>
@@ -237,11 +266,11 @@ export default function ClassesPage() {
                 ) : filtered.length === 0 ? (
                     <p style={s.empty}>No hay clases con los filtros actuales.</p>
                 ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {filtered.map((c) => {
                             const inactive = c.status !== "active";
                             return (
-                                <div key={c.id} style={{
+                                <div key={c.id} className="class-card" style={{
                                     ...s.card,
                                     borderLeft: `4px solid ${inactive ? "#ccc" : c.color ?? "#3b82f6"}`,
                                 }}>
@@ -250,26 +279,42 @@ export default function ClassesPage() {
                                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                 <p style={s.className}>{c.name}</p>
                                                 <span style={{
-                                                    ...s.badge,
-                                                    background: inactive ? "#F0F0EE" : "#F0F7F1",
-                                                    color: inactive ? "#bbb" : "#3a7d44",
+                                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                                    padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500,
+                                                    background: inactive ? "#F5F5F4" : "#F0F7F1",
+                                                    color: inactive ? "#999" : "#3a7d44",
                                                 }}>
+                                                    <span style={{
+                                                        width: 5, height: 5, borderRadius: "50%",
+                                                        background: inactive ? "#ccc" : "#3a7d44",
+                                                    }} />
                                                     {inactive ? "Inactiva" : `${c.capacity} cupo`}
                                                 </span>
                                             </div>
-                                            <p style={s.classInfo}>{c.startTime} - {c.endTime}</p>
-                                            <p style={s.classInfo}>{c.trainer}</p>
+                                            <p style={s.classInfo}>{c.startTime} - {c.endTime} · {c.trainer}</p>
                                         </div>
-                                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                        <div className="actions-group" style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                                             {inactive ? (
                                                 <>
-                                                    <button style={{ ...s.btnSmall, color: "#3a7d44" }} onClick={() => requestReactivate(c)}>Reactivar</button>
-                                                    <button style={{ ...s.btnSmall, color: "#c0392b" }} onClick={() => requestDelete(c)}>Eliminar</button>
+                                                    <button className="btn-icon-action" title="Reactivar" style={{ ...s.btnIconAction, color: "#3a7d44" }}
+                                                        onClick={() => requestReactivate(c)}>
+                                                        <i className="ti ti-refresh" style={{ fontSize: 14 }} aria-hidden />
+                                                    </button>
+                                                    <button className="btn-icon-action" title="Eliminar" style={{ ...s.btnIconAction, color: "#c0392b" }}
+                                                        onClick={() => requestDelete(c)}>
+                                                        <i className="ti ti-trash" style={{ fontSize: 14 }} aria-hidden />
+                                                    </button>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <button style={s.btnSmall} onClick={() => openEdit(c)}>Editar</button>
-                                                    <button style={{ ...s.btnSmall, color: "#c0392b" }} onClick={() => requestDeactivate(c)}>Desactivar</button>
+                                                    <button className="btn-icon-action" title="Editar" style={s.btnIconAction}
+                                                        onClick={() => openEdit(c)}>
+                                                        <i className="ti ti-pencil" style={{ fontSize: 14 }} aria-hidden />
+                                                    </button>
+                                                    <button className="btn-icon-action" title="Desactivar" style={{ ...s.btnIconAction, color: "#c0392b" }}
+                                                        onClick={() => requestDeactivate(c)}>
+                                                        <i className="ti ti-circle-off" style={{ fontSize: 14 }} aria-hidden />
+                                                    </button>
                                                 </>
                                             )}
                                         </div>
@@ -368,21 +413,33 @@ export default function ClassesPage() {
 
             <style>{`
                 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                .class-card { transition: background 0.1s ease; }
+                .class-card:hover { background: #FAFAFA; }
+                .actions-group { opacity: 0.4; transition: opacity 0.15s; }
+                .class-card:hover .actions-group { opacity: 1; }
+                .btn-icon-action:hover { background: #F0F0EE !important; border-color: #E5E4E2 !important; color: #1a1a1a !important; }
                 @media (max-width: 768px) {
                     .table-scroll table { min-width: 550px; }
                     .drawer-panel { width: 100vw !important; border-left: none !important; }
                 }
                 @media (max-width: 900px) {
-                    .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; }
+                    .classes-page > div:first-child { padding: 14px 20px 12px !important; }
+                    .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
                     .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
-                    .export-group { margin-left: 0 !important; width: 100% !important; justify-content: flex-end !important; }
                     .filter-group { width: 100% !important; }
+                    .toolbar-card { padding: 8px 10px !important; }
+                    .classes-content { padding: 6px 14px 20px !important; gap: 6px !important; }
                 }
                 @media (max-width: 600px) {
+                    .classes-page > div:first-child { padding: 10px 14px 8px !important; }
                     .filter-group { flex-direction: column !important; }
                     .filter-group > * { width: 100% !important; }
-                    .export-group { justify-content: stretch !important; }
-                    .export-group > * { flex: 1 !important; }
+                    .toolbar-card { padding: 6px 8px !important; }
+                    .classes-content { padding: 4px 10px 16px !important; gap: 4px !important; }
+                }
+                @media (max-width: 480px) {
+                    .classes-page > div:first-child { padding: 8px 10px 6px !important; }
+                    .classes-content { padding: 4px 6px 12px !important; gap: 4px !important; }
                 }
             `}</style>
 
@@ -392,14 +449,12 @@ export default function ClassesPage() {
 
 const s: Record<string, React.CSSProperties> = {
     page: { display: "flex", flexDirection: "column", minHeight: "100%" },
-    content: { padding: "8px 20px 16px", display: "flex", flexDirection: "column", gap: 10 },
+    content: { padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 10 },
     empty: { fontSize: 13, color: "#bbb", padding: 40, textAlign: "center" as const },
-    filterInput: { padding: "9px 12px", borderRadius: 6, border: "1px solid #E5E4E2", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", color: "#555" },
-    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 6, padding: "12px 14px", borderTop: "2px solid #D4AF37" },
+    card: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 6, padding: "10px 14px", borderTop: "2px solid #D4AF37" },
     className: { fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 },
     classInfo: { fontSize: 11, color: "#888", margin: "2px 0 0" },
-    badge: { fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap" as const },
-    btnSmall: { fontSize: 12, padding: "5px 12px", borderRadius: 4, border: "1px solid #E5E4E2", background: "#fff", color: "#555", cursor: "pointer" },
+    btnIconAction: { background: "none", border: "1px solid transparent", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s, border-color 0.12s, color 0.12s" },
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
     drawer: { background: "#fff", borderRadius: 10, width: 400, maxWidth: "90vw", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 30px rgba(0,0,0,0.12)" },
     drawerHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 20px", borderBottom: "1px solid #E5E4E2" },
@@ -415,5 +470,10 @@ const s: Record<string, React.CSSProperties> = {
     toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
     toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
     filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
-    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
+    searchWrap: { position: "relative", flex: "1 1 160px", maxWidth: 500 } as React.CSSProperties,
+    searchIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "#bbb", pointerEvents: "none" as const },
+    searchInput: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 26px 7px 30px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, transition: "border-color 0.15s" },
+    clearBtn: { position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#bbb", padding: 4, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" },
+    filterSelect: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "7px 24px 7px 10px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", cursor: "pointer", appearance: "none" as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", minWidth: 130 },
+    dayPill: { padding: "5px 12px", borderRadius: 20, border: "1px solid #E5E4E2", fontSize: 11, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s, color 0.12s" },
 };
