@@ -112,6 +112,16 @@ export default function ClassesPage() {
         if (!form.trainer.trim()) errs.trainer = "Requerido";
         if (form.capacity < 0) errs.capacity = "No negativo";
         if (form.dayOfWeekEnd < form.dayOfWeekStart) errs.dayOfWeekEnd = "Debe ser mayor o igual al inicio";
+        if (form.startTime >= form.endTime) errs.endTime = "Debe ser mayor a la hora de inicio";
+        // Check schedule conflict with other classes
+        const conflict = classes.find((c) => {
+            if (c.id === editingId) return false;
+            if (c.trainer !== form.trainer) return false;
+            if (c.dayOfWeekStart > form.dayOfWeekEnd || c.dayOfWeekEnd < form.dayOfWeekStart) return false;
+            if (c.startTime >= form.endTime || c.endTime <= form.startTime) return false;
+            return true;
+        });
+        if (conflict) errs.trainer = `El entrenador ya tiene "${conflict.name}" en ese horario`;
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
@@ -128,7 +138,10 @@ export default function ClassesPage() {
                 addToast("Clase creada");
             }
             setDrawerOpen(false); load();
-        } catch { addToast("Error al guardar", "error"); }
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || "Error al guardar";
+            addToast(msg, "error");
+        }
         finally { setSaving(false); }
     };
 
