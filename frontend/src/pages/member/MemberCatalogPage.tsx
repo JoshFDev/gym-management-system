@@ -15,6 +15,7 @@ export default function MemberCatalogPage() {
     const [searchInput, setSearchInput] = useState("");
     const [catFilter, setCatFilter] = useState("");
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [detail, setDetail] = useState<CatalogProduct | null>(null);
     const [detailImg, setDetailImg] = useState(0);
     const searchRef = useRef<HTMLInputElement>(null);
@@ -28,7 +29,7 @@ export default function MemberCatalogPage() {
             setProducts(prods);
             setCategories(cats);
         } catch {
-            // silent
+            setError(true);
         } finally {
             setLoading(false);
         }
@@ -177,6 +178,19 @@ export default function MemberCatalogPage() {
             <div className="inner-pad" style={s.content}>
                 {loading ? (
                     <div style={s.center}><div style={s.spinner} /></div>
+                ) : error ? (
+                    <div style={s.center}>
+                        <div style={s.emptyBox}>
+                            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="1.5" strokeLinecap="round">
+                                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            <p style={{ margin: "8px 0 12px", color: "#c0392b", fontSize: 13 }}>Error al cargar el catálogo.</p>
+                            <button onClick={() => { setError(false); setLoading(true); load(); }}
+                                style={{ background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 6, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                                Reintentar
+                            </button>
+                        </div>
+                    </div>
                 ) : filtered.length === 0 ? (
                     <div style={s.center}>
                         <div style={s.emptyBox}>

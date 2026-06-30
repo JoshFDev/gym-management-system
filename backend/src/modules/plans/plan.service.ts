@@ -99,3 +99,13 @@ export const deactivatePlan = async (
 
     return plan;
 };
+
+export const reactivatePlan = async (id: string) => {
+    const plan = await Plan.findByIdAndUpdate(
+        id,
+        { status: PlanStatus.ACTIVE },
+        { returnDocument: "after", runValidators: true }
+    );
+    if (!plan) throw new NotFoundError("Plan no encontrado.");
+    return plan;
+};

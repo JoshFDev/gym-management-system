@@ -4,6 +4,7 @@ import {
     getAll,
     update,
     remove,
+    reactivate,
 } from "./user.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
@@ -34,6 +35,13 @@ router.delete(
     authenticate,
     authorize("admin"),
     remove
+);
+
+router.patch(
+    "/:id/reactivate",
+    authenticate,
+    authorize("admin"),
+    reactivate
 );
 
 export default router;

@@ -8,12 +8,6 @@ import { sendMail, buildEmailHtml, GOLD } from "../utils/mail.util";
 
 const DAYS_BEFORE_EXPIRY = 3;
 
-const getMemberEmail = async (memberId: string): Promise<string | null> => {
-    const member = await Member.findById(memberId).select("email firstName lastName");
-    if (!member || !member.email) return null;
-    return member.email;
-};
-
 const sendExpiringReminders = async () => {
     const alertDate = new Date();
     alertDate.setDate(alertDate.getDate() + DAYS_BEFORE_EXPIRY);
@@ -25,8 +19,12 @@ const sendExpiringReminders = async () => {
         endDate: { $gte: startOfDay, $lte: endOfDay },
     }).populate("planId", "name");
 
+    const memberIds = subscriptions.map((s) => s.memberId);
+    const members = await Member.find({ _id: { $in: memberIds } }).select("email firstName lastName");
+    const emailMap = new Map(members.filter((m) => m.email).map((m) => [m._id.toString(), m.email as string]));
+
     for (const sub of subscriptions) {
-        const memberEmail = await getMemberEmail(sub.memberId.toString());
+        const memberEmail = emailMap.get(sub.memberId.toString());
         if (!memberEmail) continue;
         const planName = (sub.planId as any)?.name ?? "Plan";
         const endDate = sub.endDate.toLocaleDateString("es-MX", {
@@ -58,8 +56,12 @@ const sendExpiringReminders = async () => {
 const sendPendingPaymentReminders = async () => {
     const payments = await Payment.find({ status: PaymentStatus.PENDING }).populate("subscriptionId", "endDate");
 
+    const memberIds = payments.map((p) => p.memberId);
+    const members = await Member.find({ _id: { $in: memberIds } }).select("email firstName lastName");
+    const emailMap = new Map(members.filter((m) => m.email).map((m) => [m._id.toString(), m.email as string]));
+
     for (const payment of payments) {
-        const memberEmail = await getMemberEmail(payment.memberId.toString());
+        const memberEmail = emailMap.get(payment.memberId.toString());
         if (!memberEmail) continue;
         const amount = payment.amount.toLocaleString("es-MX");
         const dueDate = payment.paidAt

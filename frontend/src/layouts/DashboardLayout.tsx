@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { connectSocket, disconnectSocket, onNotification } from "../services/socket";
 import FloatingQrScanner from "../components/FloatingQrScanner";
+import ConfirmModal from "../components/ConfirmModal";
 
 
 
@@ -177,18 +178,15 @@ export default function DashboardLayout() {
                 {role && (role === "admin" || role === "receptionist") && <FloatingQrScanner />}
             </main>
 
-            {logoutConfirm && (
-                <div style={s.overlay} onClick={() => setLogoutConfirm(false)}>
-                    <div style={s.confirmBox} onClick={(e) => e.stopPropagation()}>
-                        <p style={s.confirmTitle}>Cerrar sesión</p>
-                        <p style={s.confirmText}>¿Estás seguro de que deseas salir?</p>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                            <button style={s.cancelBtn} onClick={() => setLogoutConfirm(false)}>Cancelar</button>
-                            <button style={s.confirmBtn} onClick={handleLogout}>Salir</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                open={logoutConfirm}
+                title="Cerrar sesión"
+                body="¿Estás seguro de que deseas salir?"
+                confirmLabel="Salir"
+                confirmColor="#c0392b"
+                onConfirm={handleLogout}
+                onCancel={() => setLogoutConfirm(false)}
+            />
 
             {showAbout && (
                 <div style={s.overlay} onClick={() => setShowAbout(false)}>

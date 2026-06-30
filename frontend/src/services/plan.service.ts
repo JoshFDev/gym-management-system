@@ -44,6 +44,11 @@ export const updatePlan = async (
     return response.data;
 };
 
+export const getPlanById = async (id: string) => {
+    const response = await api.get(`/plans/${id}`);
+    return response.data;
+};
+
 export const deactivatePlan = async (
     id: string
 ) => {

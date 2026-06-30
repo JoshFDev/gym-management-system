@@ -6,6 +6,7 @@ import {
     getPlanById,
     updatePlan,
     deactivatePlan,
+    reactivatePlan,
 } from "./plan.service";
 import { toPlanResponse } from "./plan.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
@@ -110,6 +111,34 @@ export const deactivate = asyncHandler(
         res.status(200).json({
             success: true,
             message: "Plan desactivado exitosamente.",
+            data: toPlanResponse(plan),
+        });
+    }
+);
+
+export const reactivate = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const plan = await reactivatePlan(req.params.id as string);
+
+        await logAudit({
+            action: "UPDATE",
+            entity: "Plan",
+            entityId: plan._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { status: "active" },
+        });
+
+        notifyAll({
+            type: "plan_deactivated",
+            title: "Plan reactivado",
+            message: `${plan.name} fue reactivado por ${req.user!.role}`,
+            timestamp: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Plan reactivado exitosamente.",
             data: toPlanResponse(plan),
         });
     }

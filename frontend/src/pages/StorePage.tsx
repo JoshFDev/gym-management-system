@@ -91,6 +91,9 @@ export default function StorePage() {
     const [saleSearch, setSaleSearch] = useState("");
     const [salePayFilter, setSalePayFilter] = useState("");
     const [saleStatusFilter, setSaleStatusFilter] = useState("");
+    const [salesPage, setSalesPage] = useState(1);
+    const [salesTotalPages, setSalesTotalPages] = useState(1);
+    const [salesTotal, setSalesTotal] = useState(0);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState<"deactivate" | "reactivate" | "return" | "delete">("deactivate");
     const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -110,18 +113,25 @@ export default function StorePage() {
         } catch { setError(true); }
     };
 
-    const loadSales = async () => {
+    const loadSales = async (overridePage?: number) => {
         setSalesLoading(true);
         try {
-            const res = await getSales();
+            const p = overridePage ?? salesPage;
+            const filters: { search?: string; paymentMethod?: string; status?: string } = {};
+            if (saleSearch) filters.search = saleSearch;
+            if (salePayFilter) filters.paymentMethod = salePayFilter;
+            if (saleStatusFilter) filters.status = saleStatusFilter;
+            const res = await getSales(p, 20, filters);
             setSales(res.data ?? []);
+            setSalesTotalPages(res.totalPages ?? 1);
+            setSalesTotal(res.total ?? 0);
         } catch { /* ignore */ }
         finally { setSalesLoading(false); }
     };
 
     useSocketRefresh(["product_created", "product_updated", "product_deactivated", "product_reactivated", "sale_created", "sale_returned"], () => {
         loadProducts();
-        if (tab === "sales") loadSales();
+        if (tab === "sales") loadSales(salesPage);
     });
 
     useEffect(() => {
@@ -146,13 +156,21 @@ export default function StorePage() {
         (async () => {
             setSalesLoading(true);
             try {
-                const res = await getSales();
-                if (active) setSales(res.data ?? []);
+                const filters: { search?: string; paymentMethod?: string; status?: string } = {};
+                if (saleSearch) filters.search = saleSearch;
+                if (salePayFilter) filters.paymentMethod = salePayFilter;
+                if (saleStatusFilter) filters.status = saleStatusFilter;
+                const res = await getSales(salesPage, 20, filters);
+                if (active) {
+                    setSales(res.data ?? []);
+                    setSalesTotalPages(res.totalPages ?? 1);
+                    setSalesTotal(res.total ?? 0);
+                }
             } catch { /* ignore */ }
             finally { if (active) setSalesLoading(false); }
         })();
         return () => { active = false; };
-    }, [tab]);
+    }, [tab, salesPage, saleSearch, salePayFilter, saleStatusFilter]);
 
     useEffect(() => {
         if (!saleDrawer) return;
@@ -209,16 +227,6 @@ export default function StorePage() {
         products.forEach((p) => map.set(p.category, (map.get(p.category) ?? 0) + 1));
         return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     }, [products]);
-
-    const filteredSales = useMemo(() => {
-        return sales.filter((s) => {
-            if (saleSearch && !s.buyerName.toLowerCase().includes(saleSearch.toLowerCase())) return false;
-            if (salePayFilter && s.paymentMethod !== salePayFilter) return false;
-            if (saleStatusFilter === "completed" && s.status !== "completed") return false;
-            if (saleStatusFilter === "returned" && s.status !== "returned") return false;
-            return true;
-        });
-    }, [sales, saleSearch, salePayFilter, saleStatusFilter]);
 
     // Product CRUD
     const openNewProd = () => { setEditingProd(null); setProdForm(emptyProduct); setProdImageFile(null); setProdImagePreview(null); setProdDrawer(true); };
@@ -335,7 +343,8 @@ export default function StorePage() {
         if (existing) {
             setSaleItems((prev) => prev.map((i) => i.productId === selectedProdId ? { ...i, quantity: i.quantity + 1 } : i));
         } else {
-            setSaleItems((prev) => [...prev, { productId: prod.id, productName: prod.name, quantity: 1, unitPrice: prod.price }]);
+            const activeSale = prod.salePrice && prod.salePrice > 0 && (!prod.saleEndDate || new Date(prod.saleEndDate) > new Date());
+            setSaleItems((prev) => [...prev, { productId: prod.id, productName: prod.name, quantity: 1, unitPrice: activeSale ? prod.salePrice! : prod.price }]);
         }
         setSelectedProdId("");
     };
@@ -506,14 +515,14 @@ export default function StorePage() {
                                 <div style={styles.searchWrap}>
                                     <i className="ti ti-search" style={styles.searchIcon} aria-hidden />
                                     <input style={styles.searchInput} placeholder="Buscar por comprador…" value={saleSearch}
-                                        onChange={(e) => setSaleSearch(e.target.value)} />
-                                    {saleSearch && <button style={styles.clearBtn} onClick={() => setSaleSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                                        onChange={(e) => { setSaleSearch(e.target.value); setSalesPage(1); }} />
+                                    {saleSearch && <button style={styles.clearBtn} onClick={() => { setSaleSearch(""); setSalesPage(1); }}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
                                 </div>
-                                <select style={styles.filterSelect} value={salePayFilter} onChange={(e) => setSalePayFilter(e.target.value)}>
+                                <select style={styles.filterSelect} value={salePayFilter} onChange={(e) => { setSalePayFilter(e.target.value); setSalesPage(1); }}>
                                     <option value="">Todos los pagos</option>
                                     {PAYMENT_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
-                                <select style={styles.filterSelect} value={saleStatusFilter} onChange={(e) => setSaleStatusFilter(e.target.value)}>
+                                <select style={styles.filterSelect} value={saleStatusFilter} onChange={(e) => { setSaleStatusFilter(e.target.value); setSalesPage(1); }}>
                                     <option value="">Todos los estados</option>
                                     <option value="completed">Completadas</option>
                                     <option value="returned">Devueltas</option>
@@ -737,7 +746,7 @@ export default function StorePage() {
                     <>
                         {salesLoading ? (
                             <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
-                        ) : filteredSales.length === 0 ? (
+                        ) : sales.length === 0 ? (
                             <p style={styles.empty}>{saleSearch || salePayFilter || saleStatusFilter ? "No hay ventas con esos filtros." : "No hay ventas registradas."}</p>
                         ) : (
                             <div style={{ ...styles.card, padding: 0 }}>
@@ -751,7 +760,7 @@ export default function StorePage() {
                                         <th style={styles.th}>Estado</th>
                                         <th style={styles.th}>Acciones</th>
                                     </tr></thead>
-                                    <tbody>{filteredSales.map((s) => {
+                                    <tbody>{sales.map((s) => {
                                         const returned = s.status === "returned";
                                         return (
                                             <tr key={s.id} style={styles.row}>
@@ -787,6 +796,7 @@ export default function StorePage() {
                                         );
                                     })}</tbody>
                                 </table>
+                                <Pagination page={salesPage} totalPages={salesTotalPages} total={salesTotal} limit={20} onChange={setSalesPage} />
                             </div>
                         )}
                     </>

@@ -4,7 +4,6 @@ import { CreateMemberInput } from "./member.validation";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 import { BadRequestError } from "../../shared/errors/BadRequestError";
 import { UpdateMemberInput } from "./member.validation";
-import AuditLog from "../auditLog/auditLog.model";
 import Subscription from "../subscriptions/subscription.model";
 import { SubscriptionStatus } from "../subscriptions/subscription.types";
 import Payment from "../payments/payment.model";
@@ -120,17 +119,4 @@ export const deactivateMember = async (
     }
 
     return member;
-};
-
-interface LogAuditParams {
-    action: "CREATE" | "UPDATE" | "DELETE";
-    entity: string;
-    entityId: string;
-    userId: string;
-    userRole: string;
-    changes?: Record<string, any>;
-}
-
-export const logAudit = async (params: LogAuditParams) => {
-    await AuditLog.create(params);
 };

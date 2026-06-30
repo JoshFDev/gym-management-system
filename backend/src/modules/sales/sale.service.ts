@@ -4,6 +4,7 @@ import { CreateSaleInput } from "./sale.validation";
 import { SaleStatus } from "./sale.types";
 import { NotFoundError } from "../../shared/errors/NotFoundError";
 import { ConflictError } from "../../shared/errors/ConflictError";
+import { paginate } from "../../shared/utils/pagination";
 
 export const createSale = async (data: CreateSaleInput, registeredBy: string) => {
     // Validate stock and deduct
@@ -25,9 +26,19 @@ export const createSale = async (data: CreateSaleInput, registeredBy: string) =>
     return sale;
 };
 
-export const getSales = async () => {
-    const sales = await Sale.find().sort({ createdAt: -1 });
-    return sales;
+export const getSales = async (
+    page: number = 1,
+    limit: number = 20,
+    filters?: { search?: string; paymentMethod?: string; status?: string }
+) => {
+    const query: Record<string, unknown> = {};
+    if (filters?.paymentMethod) query.paymentMethod = filters.paymentMethod;
+    if (filters?.status) query.status = filters.status;
+    if (filters?.search) {
+        query.buyerName = { $regex: filters.search, $options: "i" };
+    }
+    const result = await paginate(Sale, query, page, limit, { createdAt: -1 });
+    return result;
 };
 
 export const getSaleById = async (id: string) => {

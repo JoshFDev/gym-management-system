@@ -1,5 +1,7 @@
+import { useEffect } from "react";
+import { useNavigate, BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { setAuthRedirect } from "../api/axios";
 import ErrorBoundary from "../components/ErrorBoundary";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import DashboardLayout from "../layouts/DashboardLayout";
 import MemberLayout from "../layouts/MemberLayout";
@@ -29,10 +31,19 @@ function RootRedirect() {
         : <Navigate to="/login" replace />;
 }
 
+function AuthRedirectInit() {
+    const navigate = useNavigate();
+    useEffect(() => {
+        setAuthRedirect(() => navigate("/login", { replace: true }));
+    }, [navigate]);
+    return null;
+}
+
 export default function AppRouter() {
     return (
         <ErrorBoundary>
             <BrowserRouter>
+                <AuthRedirectInit />
                 <Routes>
                     <Route path="/" element={<RootRedirect />} />
 

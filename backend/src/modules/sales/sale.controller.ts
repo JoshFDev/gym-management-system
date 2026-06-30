@@ -58,9 +58,23 @@ export const create = asyncHandler(async (req: AuthRequest, res: Response) => {
     res.status(201).json({ success: true, message: "Venta registrada exitosamente.", data: toSaleResponse(sale) });
 });
 
-export const getAll = asyncHandler(async (_req: Request, res: Response) => {
-    const sales = await getSales();
-    res.status(200).json({ success: true, data: sales.map(toSaleResponse) });
+export const getAll = asyncHandler(async (req: Request, res: Response) => {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const filters = {
+        search: req.query.search as string | undefined,
+        paymentMethod: req.query.paymentMethod as string | undefined,
+        status: req.query.status as string | undefined,
+    };
+    const result = await getSales(page, limit, filters);
+    res.status(200).json({
+        success: true,
+        data: result.items.map(toSaleResponse),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+    });
 });
 
 export const getById = asyncHandler(async (req: Request, res: Response) => {

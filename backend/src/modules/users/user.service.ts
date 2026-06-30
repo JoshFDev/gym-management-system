@@ -88,3 +88,11 @@ export const deleteUser = async (
 
     return { user, deleted: false as const };
 };
+
+export const reactivateUser = async (id: string) => {
+    const user = await User.findById(id);
+    if (!user) throw new NotFoundError("Usuario no encontrado.");
+    user.isActive = true;
+    await user.save();
+    return user;
+};

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
-import { getUsers, updateUser, deleteUser } from "./user.service";
+import { getUsers, updateUser, deleteUser, reactivateUser } from "./user.service";
 import { UserRole } from "../auth/auth.types";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
@@ -98,6 +98,45 @@ export const remove = asyncHandler(
                 email: user.email,
                 role: user.role,
                 isActive: false,
+            },
+        });
+    }
+);
+
+export const reactivate = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const user = await reactivateUser(req.params.id as string);
+
+        await logAudit({
+            action: "UPDATE",
+            entity: "User",
+            entityId: user._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { isActive: true },
+        });
+
+        notifyAdmins({
+            type: "user_updated",
+            title: "Usuario reactivado",
+            message: `${user.firstName} ${user.lastName} fue reactivado por ${req.user!.role}`,
+            userId: user._id.toString(),
+            timestamp: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Usuario reactivado exitosamente.",
+            data: {
+                id: user._id.toString(),
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
             },
         });
     }

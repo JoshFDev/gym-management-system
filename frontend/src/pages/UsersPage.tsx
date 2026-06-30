@@ -403,7 +403,7 @@ export default function UsersPage() {
         } catch { setUsers([]); }
     };
 
-    useSocketRefresh(["user_updated", "user_deactivated"], loadUsers);
+    useSocketRefresh(["user_created", "user_updated", "user_deactivated"], loadUsers);
 
     useEffect(() => {
         (async () => { try { await loadUsers(); } catch { setUsers([]); } finally { setLoading(false); } })();

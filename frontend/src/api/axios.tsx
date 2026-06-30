@@ -4,6 +4,12 @@ const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:3000/api",
 });
 
+let navigateToLogin: (() => void) | null = null;
+
+export const setAuthRedirect = (fn: () => void) => {
+    navigateToLogin = fn;
+};
+
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -18,9 +24,7 @@ api.interceptors.response.use(
         if (err.response?.status === 401) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
-            if (window.location.pathname !== "/login") {
-                window.location.href = "/login";
-            }
+            navigateToLogin?.();
         }
         return Promise.reject(err);
     }

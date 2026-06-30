@@ -25,8 +25,12 @@ interface CreateSaleData {
     paymentMethod: string;
 }
 
-export const getSales = async () => {
-    const res = await api.get("/sales");
+export const getSales = async (page: number = 1, limit: number = 20, filters?: { search?: string; paymentMethod?: string; status?: string }) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (filters?.search) params.set("search", filters.search);
+    if (filters?.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
+    if (filters?.status) params.set("status", filters.status);
+    const res = await api.get(`/sales?${params.toString()}`);
     return res.data;
 };
 
