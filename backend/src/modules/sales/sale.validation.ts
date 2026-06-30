@@ -14,6 +14,7 @@ export const createSaleSchema = z.object({
     buyerType: z.enum(BuyerType),
     buyerId: z.string().optional(),
     buyerName: z.string().trim().min(1, "El nombre del comprador es obligatorio"),
+    buyerEmail: z.string().email().optional(),
     paymentMethod: z.enum(PaymentMethod),
     status: z.enum(SaleStatus).optional(),
 });

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
-import { createProduct, getProducts, getProductById, updateProduct, deactivateProduct, reactivateProduct, getCategories } from "./product.service";
+import { createProduct, getProducts, getProductById, updateProduct, deactivateProduct, reactivateProduct, getCategories, toggleFeatured } from "./product.service";
 import { toProductResponse } from "./product.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
@@ -110,6 +110,28 @@ export const categories = asyncHandler(async (_req: Request, res: Response) => {
     res.status(200).json({ success: true, data: cats });
 });
 
+export const toggleFeaturedHandler = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const product = await toggleFeatured(req.params.id as string);
+
+    await logAudit({
+        action: "UPDATE",
+        entity: "Product",
+        entityId: product._id.toString(),
+        userId: req.user!.userId,
+        userRole: req.user!.role,
+        changes: { featured: product.featured },
+    });
+
+    notifyAll({
+        type: product.featured ? "product_reactivated" : "product_deactivated",
+        title: product.featured ? "Producto destacado" : "Producto no destacado",
+        message: `${product.name} ${product.featured ? "marcado como destacado" : "quitado de destacados"} por ${req.user!.role}`,
+        timestamp: new Date().toISOString(),
+    });
+
+    res.status(200).json({ success: true, data: toProductResponse(product) });
+});
+
 export const uploadImage = asyncHandler(async (req: AuthRequest, res: Response) => {
     const product = await getProductById(req.params.id as string);
     if (!req.file) {
@@ -117,16 +139,22 @@ export const uploadImage = asyncHandler(async (req: AuthRequest, res: Response) 
         return;
     }
     const imageUrl = `/uploads/products/${req.file.filename}`;
-    const updated = await updateProduct(product._id.toString(), { image: imageUrl });
+    const images = [...(product.images || []), imageUrl].slice(-3);
+    const updated = await updateProduct(product._id.toString(), { image: imageUrl, images });
     res.status(200).json({ success: true, message: "Imagen subida exitosamente.", data: toProductResponse(updated) });
 });
 
 export const deleteImage = asyncHandler(async (req: AuthRequest, res: Response) => {
     const product = await getProductById(req.params.id as string);
-    if (product.image) {
-        const filePath = path.join(__dirname, "../../../../", product.image);
+    const index = parseInt(req.params.index as string, 10);
+    const images = product.images || [];
+    if (index >= 0 && index < images.length) {
+        const imgPath = images[index];
+        const filePath = path.join(__dirname, "../../../../", imgPath);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        images.splice(index, 1);
     }
-    const updated = await updateProduct(product._id.toString(), { image: undefined });
+    const newImage = images.length > 0 ? images[images.length - 1] : undefined;
+    const updated = await updateProduct(product._id.toString(), { image: newImage, images });
     res.status(200).json({ success: true, message: "Imagen eliminada.", data: toProductResponse(updated) });
 });

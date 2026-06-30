@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { create, getAll, getById, update, deactivate, reactivate, categories, uploadImage, deleteImage } from "./product.controller";
+import { create, getAll, getById, update, deactivate, reactivate, categories, uploadImage, deleteImage, toggleFeaturedHandler } from "./product.controller";
 import { validate } from "../../middlewares/validate.middleware";
 import { createProductSchema, updateProductSchema } from "./product.validation";
 import { authenticate } from "../../shared/middlewares/authenticate";
@@ -38,7 +38,8 @@ router.post("/", authenticate, authorize("admin", "receptionist"), validate(crea
 router.put("/:id", authenticate, authorize("admin", "receptionist"), validate(updateProductSchema), update);
 router.delete("/:id/deactivate", authenticate, authorize("admin", "receptionist"), deactivate);
 router.patch("/:id/reactivate", authenticate, authorize("admin", "receptionist"), reactivate);
+router.patch("/:id/toggle-featured", authenticate, authorize("admin", "receptionist"), toggleFeaturedHandler);
 router.post("/:id/upload", authenticate, authorize("admin", "receptionist"), upload.single("image"), uploadImage);
-router.delete("/:id/image", authenticate, authorize("admin", "receptionist"), deleteImage);
+router.delete("/:id/images/:index", authenticate, authorize("admin", "receptionist"), deleteImage);
 
 export default router;

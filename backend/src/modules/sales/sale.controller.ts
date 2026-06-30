@@ -5,9 +5,30 @@ import { toSaleResponse } from "./sale.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
+import { sendMail } from "../../shared/utils/mail.util";
 
 export const create = asyncHandler(async (req: AuthRequest, res: Response) => {
     const sale = await createSale(req.body, req.user!.userId);
+
+    // Send email confirmation
+    if (req.body.buyerEmail) {
+        const itemsHtml = sale.items
+            .map((i) => `<tr><td>${i.productName}</td><td>${i.quantity}</td><td>$${i.unitPrice.toFixed(2)}</td><td>$${(i.quantity * i.unitPrice).toFixed(2)}</td></tr>`)
+            .join("");
+        sendMail(
+            req.body.buyerEmail,
+            "Ticket de compra - ZenithGym",
+            `<h2>Gracias por tu compra</h2>
+             <p><strong>Comprador:</strong> ${sale.buyerName}</p>
+             <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:500px">
+               <thead><tr style="background:#1a1a1a;color:#fff"><th>Producto</th><th>Cant</th><th>P/U</th><th>Subtotal</th></tr></thead>
+               <tbody>${itemsHtml}</tbody>
+               <tfoot><tr style="font-weight:700"><td colspan="3">Total</td><td>$${sale.total.toFixed(2)}</td></tr></tfoot>
+             </table>
+             <p><strong>Método de pago:</strong> ${req.body.paymentMethod === "cash" ? "Efectivo" : req.body.paymentMethod === "card" ? "Tarjeta" : "Transferencia"}</p>
+             <p style="color:#888;font-size:12px">ZenithGym - ${new Date().toLocaleString("es-ES")}</p>`
+        ).catch(() => {});
+    }
 
     await logAudit({
         action: "CREATE",

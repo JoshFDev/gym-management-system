@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { getProducts, createProduct, updateProduct, deactivateProduct, reactivateProduct, getCategories, uploadProductImage, deleteProductImage, type Product } from "../services/product.service";
+import { getProducts, createProduct, updateProduct, deactivateProduct, reactivateProduct, getCategories, uploadProductImage, deleteProductImageByIndex, toggleProductFeatured, type Product } from "../services/product.service";
 import { getSales, createSale, returnSale, type Sale } from "../services/sale.service";
 import { getMembers } from "../services/member.service";
 import { getUsers } from "../services/user.service";
@@ -14,7 +14,28 @@ import ConfirmModal from "../components/ConfirmModal";
 const PAYMENT_LABEL: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
 const PAYMENT_OPTIONS = Object.entries(PAYMENT_LABEL);
 
-const emptyProduct = { name: "", description: "", price: 0, stock: 0, category: "" };
+const emptyProduct = { name: "", description: "", price: 0, stock: 0, category: "", featured: false, originalPrice: 0, salePrice: 0, saleEndDate: "" };
+
+function exportCSV(products: Product[]) {
+    const headers = ["Nombre", "Categoría", "Precio", "Precio oferta", "Stock", "Estado", "Destacado"];
+    const rows = products.map((p) => [
+        `"${p.name}"`,
+        `"${p.category}"`,
+        p.price.toFixed(2),
+        p.salePrice ? p.salePrice.toFixed(2) : "",
+        p.stock,
+        p.status === "active" ? "Activo" : "Inactivo",
+        p.featured ? "Sí" : "No",
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inventario-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
 
 export default function StorePage() {
     const { addToast } = useToast();
@@ -36,6 +57,12 @@ export default function StorePage() {
     const [priceMin, setPriceMin] = useState("");
     const [priceMax, setPriceMax] = useState("");
     const [stockFilter, setStockFilter] = useState("");
+    const [sortBy, setSortBy] = useState("name");
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+    // Inline stock editing
+    const [editingStockId, setEditingStockId] = useState<string | null>(null);
+    const [editingStockVal, setEditingStockVal] = useState(0);
 
     // Product drawer
     const [prodDrawer, setProdDrawer] = useState(false);
@@ -49,16 +76,22 @@ export default function StorePage() {
     // Sale drawer
     const [saleDrawer, setSaleDrawer] = useState(false);
     const [saleItems, setSaleItems] = useState<{ productId: string; productName: string; quantity: number; unitPrice: number }[]>([]);
-    const [saleBuyerType, setSaleBuyerType] = useState<"member" | "staff">("member");
+    const [saleBuyerType, setSaleBuyerType] = useState<"member" | "staff" | "other">("member");
     const [saleBuyerName, setSaleBuyerName] = useState("");
     const [saleBuyerId, setSaleBuyerId] = useState("");
+    const [saleBuyerEmail, setSaleBuyerEmail] = useState("");
+    const [sendTicketEmail, setSendTicketEmail] = useState(true);
     const [salePayment, setSalePayment] = useState("cash");
     const [saleSaving, setSaleSaving] = useState(false);
-    const [members, setMembers] = useState<{ id: string; fullName: string }[]>([]);
-    const [staffUsers, setStaffUsers] = useState<{ id: string; fullName: string }[]>([]);
+    const [members, setMembers] = useState<{ id: string; fullName: string; email?: string }[]>([]);
+    const [staffUsers, setStaffUsers] = useState<{ id: string; fullName: string; email?: string }[]>([]);
     const [selectedProdId, setSelectedProdId] = useState("");
+    const [saleMemberSearch, setSaleMemberSearch] = useState("");
 
-    // Confirm
+    // Sales filters
+    const [saleSearch, setSaleSearch] = useState("");
+    const [salePayFilter, setSalePayFilter] = useState("");
+    const [saleStatusFilter, setSaleStatusFilter] = useState("");
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState<"deactivate" | "reactivate" | "return" | "delete">("deactivate");
     const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -106,15 +139,15 @@ export default function StorePage() {
     useEffect(() => {
         if (saleDrawer) {
             Promise.all([
-                getMembers(1, 200).then((r) => setMembers(r.data ?? [])).catch(() => {}),
-                getUsers().then((r) => setStaffUsers((r.data ?? []).map((u: any) => ({ id: u.id, fullName: `${u.firstName} ${u.lastName}` })))).catch(() => {}),
+                getMembers(1, 200).then((r) => setMembers(r.data?.items ?? [])).catch(() => {}),
+                getUsers().then((r) => setStaffUsers((r.data ?? []).map((u: any) => ({ id: u.id, fullName: `${u.firstName} ${u.lastName}`, email: u.email })))).catch(() => {}),
             ]);
         }
     }, [saleDrawer]);
 
-    // Filtered products
+    // Filtered + sorted products
     const filtered = useMemo(() => {
-        return products.filter((p) => {
+        let result = products.filter((p) => {
             if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
             if (catFilter && p.category !== catFilter) return false;
             if (priceMin && p.price < Number(priceMin)) return false;
@@ -124,7 +157,19 @@ export default function StorePage() {
             if (stockFilter === "available" && (p.stock === 0 || p.status !== "active")) return false;
             return true;
         });
-    }, [products, search, catFilter, priceMin, priceMax, stockFilter]);
+        result.sort((a, b) => {
+            const aFeatured = a.featured ? 0 : 1;
+            const bFeatured = b.featured ? 0 : 1;
+            if (aFeatured !== bFeatured) return aFeatured - bFeatured;
+            if (sortBy === "price") return a.price - b.price;
+            if (sortBy === "price-desc") return b.price - a.price;
+            if (sortBy === "stock") return a.stock - b.stock;
+            if (sortBy === "stock-desc") return b.stock - a.stock;
+            if (sortBy === "created") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            return a.name.localeCompare(b.name);
+        });
+        return result;
+    }, [products, search, catFilter, priceMin, priceMax, stockFilter, sortBy]);
 
     // Paginated
     const paginated = useMemo(() => {
@@ -140,24 +185,63 @@ export default function StorePage() {
     }, [filtered.length, limit, page]);
 
     const allCategories = useMemo(() => {
-        const s = new Set(products.map((p) => p.category));
-        return Array.from(s).sort();
+        const map = new Map<string, number>();
+        products.forEach((p) => map.set(p.category, (map.get(p.category) ?? 0) + 1));
+        return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     }, [products]);
+
+    const filteredSales = useMemo(() => {
+        return sales.filter((s) => {
+            if (saleSearch && !s.buyerName.toLowerCase().includes(saleSearch.toLowerCase())) return false;
+            if (salePayFilter && s.paymentMethod !== salePayFilter) return false;
+            if (saleStatusFilter === "completed" && s.status !== "completed") return false;
+            if (saleStatusFilter === "returned" && s.status !== "returned") return false;
+            return true;
+        });
+    }, [sales, saleSearch, salePayFilter, saleStatusFilter]);
 
     // Product CRUD
     const openNewProd = () => { setEditingProd(null); setProdForm(emptyProduct); setProdImageFile(null); setProdImagePreview(null); setProdDrawer(true); };
-    const openEditProd = (p: Product) => { setEditingProd(p.id); setProdForm({ name: p.name, description: p.description ?? "", price: p.price, stock: p.stock, category: p.category }); setProdImageFile(null); setProdImagePreview(p.image ?? null); setProdDrawer(true); };
+    const openEditProd = (p: Product) => {
+        setEditingProd(p.id);
+        setProdForm({
+            name: p.name,
+            description: p.description ?? "",
+            price: p.price,
+            stock: p.stock,
+            category: p.category,
+            featured: p.featured ?? false,
+            originalPrice: p.originalPrice ?? 0,
+            salePrice: p.salePrice ?? 0,
+            saleEndDate: p.saleEndDate ? new Date(p.saleEndDate).toISOString().slice(0, 10) : "",
+        });
+        setProdImageFile(null);
+        setProdImagePreview(p.image ?? null);
+        setProdDrawer(true);
+    };
 
     const handleSaveProd = async () => {
         if (!prodForm.name.trim() || !prodForm.category.trim()) return;
         setProdSaving(true);
         try {
+            const payload: any = {
+                name: prodForm.name,
+                description: prodForm.description || undefined,
+                price: prodForm.price,
+                stock: prodForm.stock,
+                category: prodForm.category,
+                featured: prodForm.featured,
+            };
+            if (prodForm.originalPrice > 0) payload.originalPrice = prodForm.originalPrice;
+            if (prodForm.salePrice > 0) payload.salePrice = prodForm.salePrice;
+            if (prodForm.saleEndDate) payload.saleEndDate = new Date(prodForm.saleEndDate).toISOString();
+
             let productId = editingProd;
             if (editingProd) {
-                await updateProduct(editingProd, prodForm);
+                await updateProduct(editingProd, payload);
                 addToast("Producto actualizado");
             } else {
-                const res = await createProduct(prodForm);
+                const res = await createProduct(payload);
                 productId = res.data.id;
                 addToast("Producto creado");
             }
@@ -170,6 +254,27 @@ export default function StorePage() {
         } catch (err: any) {
             addToast(err?.response?.data?.message || "Error al guardar", "error");
         } finally { setProdSaving(false); }
+    };
+
+    const handleQuickStockSave = async (productId: string) => {
+        try {
+            await updateProduct(productId, { stock: editingStockVal });
+            setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, stock: editingStockVal } : p));
+            setEditingStockId(null);
+            addToast("Stock actualizado");
+        } catch (err: any) {
+            addToast(err?.response?.data?.message || "Error", "error");
+        }
+    };
+
+    const handleToggleFeatured = async (id: string) => {
+        try {
+            const res = await toggleProductFeatured(id);
+            setProducts((prev) => prev.map((p) => p.id === id ? { ...p, featured: res.data.featured } : p));
+            addToast(res.data.featured ? "Producto destacado" : "Producto no destacado");
+        } catch (err: any) {
+            addToast(err?.response?.data?.message || "Error", "error");
+        }
     };
 
     const requestDeactivate = (id: string) => { setConfirmTarget(id); setConfirmAction("deactivate"); setConfirmOpen(true); };
@@ -235,6 +340,7 @@ export default function StorePage() {
                 buyerType: saleBuyerType,
                 buyerId: saleBuyerId || undefined,
                 buyerName: saleBuyerName,
+                buyerEmail: sendTicketEmail && saleBuyerEmail ? saleBuyerEmail : undefined,
                 paymentMethod: salePayment,
             });
             addToast("Venta registrada");
@@ -242,6 +348,7 @@ export default function StorePage() {
             setSaleItems([]);
             setSaleBuyerName("");
             setSaleBuyerId("");
+            setSaleBuyerEmail("");
             loadProducts();
             loadSales();
         } catch (err: any) {
@@ -254,9 +361,45 @@ export default function StorePage() {
         setSaleBuyerType("member");
         setSaleBuyerName("");
         setSaleBuyerId("");
+        setSaleBuyerEmail("");
+        setSendTicketEmail(true);
         setSalePayment("cash");
         setSelectedProdId("");
+        setSaleMemberSearch("");
         setSaleDrawer(true);
+    };
+
+    const printSaleTicket = (s: Sale) => {
+        const itemsLines = s.items.map((i) =>
+            `<tr><td>${i.productName}</td><td>${i.quantity}</td><td>$${i.unitPrice.toFixed(2)}</td><td>$${(i.quantity * i.unitPrice).toFixed(2)}</td></tr>`
+        ).join("");
+        const win = window.open("", "_blank");
+        if (!win) return;
+        win.document.write(`
+            <html><head><title>Ticket - ZenithGym</title>
+            <style>
+                body { font-family: 'Courier New', monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 16px; }
+                h2 { text-align: center; margin: 0 0 4px; font-size: 16px; }
+                .header { text-align: center; font-size: 11px; color: #555; margin-bottom: 12px; }
+                table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+                th, td { padding: 4px 2px; text-align: left; border-bottom: 1px solid #ddd; font-size: 11px; }
+                th { font-size: 10px; color: #888; }
+                .total { font-weight: bold; font-size: 14px; text-align: right; margin: 8px 0; }
+                .footer { text-align: center; font-size: 10px; color: #888; margin-top: 12px; border-top: 1px dashed #ccc; padding-top: 8px; }
+                .label { color: #888; font-size: 10px; }
+            </style></head><body>
+            <h2>ZenithGym</h2>
+            <div class="header">Ticket de compra<br/>${new Date(s.createdAt).toLocaleString("es-ES")}</div>
+            <p><span class="label">Comprador:</span> ${s.buyerName}</p>
+            <table><thead><tr><th>Producto</th><th>Cant</th><th>P/U</th><th>Subtotal</th></tr></thead>
+            <tbody>${itemsLines}</tbody></table>
+            <div class="total">Total: $${s.total.toFixed(2)}</div>
+            <p><span class="label">Pago:</span> ${PAYMENT_LABEL[s.paymentMethod] ?? s.paymentMethod}</p>
+            <div class="footer">Gracias por tu compra</div>
+            </body></html>
+        `);
+        win.document.close();
+        setTimeout(() => { win.focus(); win.print(); }, 300);
     };
 
     return (
@@ -294,7 +437,7 @@ export default function StorePage() {
                                 </div>
                                 <select style={styles.filterSelect} value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setPage(1); }}>
                                     <option value="">Todas las categorías</option>
-                                    {allCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    {allCategories.map(([cat, count]) => <option key={cat} value={cat}>{cat} ({count})</option>)}
                                 </select>
                                 <select style={styles.filterSelect} value={stockFilter} onChange={(e) => { setStockFilter(e.target.value); setPage(1); }}>
                                     <option value="">Stock: Todos</option>
@@ -302,36 +445,91 @@ export default function StorePage() {
                                     <option value="low">Stock bajo (≤5)</option>
                                     <option value="out">Agotado</option>
                                 </select>
+                                <select style={styles.filterSelect} value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(1); }}>
+                                    <option value="name">Nombre A-Z</option>
+                                    <option value="price">Precio: menor</option>
+                                    <option value="price-desc">Precio: mayor</option>
+                                    <option value="stock">Stock: menor</option>
+                                    <option value="stock-desc">Stock: mayor</option>
+                                    <option value="created">Más recientes</option>
+                                </select>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                     <span style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>Precio:</span>
                                     <input type="number" min={0} placeholder="Min" value={priceMin}
                                         onChange={(e) => { setPriceMin(e.target.value); setPage(1); }}
-                                        style={{ ...styles.filterInput, width: 65 }} />
+                                        style={{ ...styles.filterInput, width: 60 }} />
                                     <span style={{ fontSize: 11, color: "#ccc" }}>—</span>
                                     <input type="number" min={0} placeholder="Max" value={priceMax}
                                         onChange={(e) => { setPriceMax(e.target.value); setPage(1); }}
-                                        style={{ ...styles.filterInput, width: 65 }} />
+                                        style={{ ...styles.filterInput, width: 60 }} />
+                                </div>
+                                <div style={{ display: "flex", gap: 2, marginLeft: "auto" }}>
+                                    <button onClick={() => exportCSV(filtered)} title="Exportar CSV"
+                                        style={{ ...styles.viewToggleBtn, color: "#3a7d44" }}>
+                                        <i className="ti ti-file-spreadsheet" style={{ fontSize: 14 }} aria-hidden />
+                                    </button>
+                                    <button onClick={() => setViewMode("grid")} title="Vista cuadrícula"
+                                        style={{ ...styles.viewToggleBtn, background: viewMode === "grid" ? "#1a1a1a" : "transparent", color: viewMode === "grid" ? "#fff" : "#888" }}>
+                                        <i className="ti ti-layout-grid" style={{ fontSize: 14 }} aria-hidden />
+                                    </button>
+                                    <button onClick={() => setViewMode("list")} title="Vista lista"
+                                        style={{ ...styles.viewToggleBtn, background: viewMode === "list" ? "#1a1a1a" : "transparent", color: viewMode === "list" ? "#fff" : "#888" }}>
+                                        <i className="ti ti-list" style={{ fontSize: 14 }} aria-hidden />
+                                    </button>
                                 </div>
                             </>
                         ) : (
-                            <span style={{ fontSize: 13, color: "#888" }}>{total} venta(s) registradas</span>
+                            <>
+                                <div style={styles.searchWrap}>
+                                    <i className="ti ti-search" style={styles.searchIcon} aria-hidden />
+                                    <input style={styles.searchInput} placeholder="Buscar por comprador…" value={saleSearch}
+                                        onChange={(e) => setSaleSearch(e.target.value)} />
+                                    {saleSearch && <button style={styles.clearBtn} onClick={() => setSaleSearch("")}><i className="ti ti-x" style={{ fontSize: 12 }} aria-hidden /></button>}
+                                </div>
+                                <select style={styles.filterSelect} value={salePayFilter} onChange={(e) => setSalePayFilter(e.target.value)}>
+                                    <option value="">Todos los pagos</option>
+                                    {PAYMENT_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                </select>
+                                <select style={styles.filterSelect} value={saleStatusFilter} onChange={(e) => setSaleStatusFilter(e.target.value)}>
+                                    <option value="">Todos los estados</option>
+                                    <option value="completed">Completadas</option>
+                                    <option value="returned">Devueltas</option>
+                                </select>
+                            </>
                         )}
                     </div>
                 </div>
 
-                {/* Low stock notification banner */}
-                {tab === "products" && products.filter((p) => p.status === "active" && p.stock > 0 && p.stock <= 5).length > 0 && (
-                    <div style={{
-                        display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
-                        background: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 8,
-                        fontSize: 12, color: "#795548"
-                    }}>
-                        <i className="ti ti-alert-triangle" style={{ fontSize: 14, color: "#FFA000" }} aria-hidden />
-                        <span>
-                            <strong>Stock faltante: </strong>
-                            {products.filter((p) => p.status === "active" && p.stock > 0 && p.stock <= 5).length} producto(s) por agotarse
-                        </span>
-                    </div>
+                {/* Low stock notification banners */}
+                {tab === "products" && (
+                    <>
+                        {products.filter((p) => p.status === "active" && p.stock > 0 && p.stock <= 5).length > 0 && (
+                            <div style={{
+                                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                                background: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 8,
+                                fontSize: 12, color: "#795548"
+                            }}>
+                                <i className="ti ti-alert-triangle" style={{ fontSize: 14, color: "#FFA000" }} aria-hidden />
+                                <span>
+                                    <strong>Stock faltante: </strong>
+                                    {products.filter((p) => p.status === "active" && p.stock > 0 && p.stock <= 5).length} producto(s) por agotarse
+                                </span>
+                            </div>
+                        )}
+                        {products.filter((p) => p.status === "active" && p.stock === 0).length > 0 && (
+                            <div style={{
+                                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                                background: "#FFEBEE", border: "1px solid #EF9A9A", borderRadius: 8,
+                                fontSize: 12, color: "#c0392b"
+                            }}>
+                                <i className="ti ti-alert-circle" style={{ fontSize: 14, color: "#E53935" }} aria-hidden />
+                                <span>
+                                    <strong>Stock crítico: </strong>
+                                    {products.filter((p) => p.status === "active" && p.stock === 0).length} producto(s) agotados
+                                </span>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {tab === "products" ? (
@@ -348,13 +546,104 @@ export default function StorePage() {
                             </div>
                         ) : paginated.length === 0 ? (
                             <p style={styles.empty}>{search || catFilter || priceMin || priceMax ? "No hay productos con esos filtros." : "No hay productos registrados."}</p>
+                        ) : viewMode === "list" ? (
+                            <div style={{ ...styles.card, padding: 0 }}>
+                                <div className="table-scroll">
+                                <table style={styles.table}>
+                                    <thead><tr style={styles.thead}>
+                                        <th style={{ ...styles.th, paddingLeft: 16 }}>Producto</th>
+                                        <th style={styles.th}>Categoría</th>
+                                        <th style={styles.th}>Precio</th>
+                                        <th style={styles.th}>Stock</th>
+                                        <th style={styles.th}>Estado</th>
+                                        <th style={{ ...styles.th, textAlign: "left" }}>Acciones</th>
+                                    </tr></thead>
+                                    <tbody>{paginated.map((p) => {
+                                        const inactive = p.status !== "active";
+                                        const lowStock = p.stock <= 5 && !inactive;
+                                        return (
+                                            <tr key={p.id} style={styles.row} className="store-row">
+                                                <td style={{ ...styles.td, paddingLeft: 16, fontWeight: 500, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                                    title={p.description || p.name}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                                        {p.image ? (
+                                                            <img src={p.image} alt={p.name} style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+                                                        ) : (
+                                                            <span style={{ width: 40, height: 40, borderRadius: 6, background: "#F7F7F6", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 14, flexShrink: 0 }}><i className="ti ti-photo" /></span>
+                                                        )}
+                                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                                                    {p.featured && <i className="ti ti-star" style={{ fontSize: 12, color: "#D4AF37", flexShrink: 0 }} />}
+                                                    </div>
+                                                </td>
+                                                <td style={{ ...styles.td, ...styles.muted }}>{p.category}</td>
+                                                <td style={styles.td}>
+                                                    {p.salePrice && p.salePrice > 0 ? (
+                                                        <span><span style={{ textDecoration: "line-through", color: "#bbb", marginRight: 4 }}>${p.price.toFixed(2)}</span>${p.salePrice.toFixed(2)}</span>
+                                                    ) : (
+                                                        `$${p.price.toFixed(2)}`
+                                                    )}
+                                                </td>
+                                                <td style={styles.td}>
+                                                    {editingStockId === p.id ? (
+                                                        <input type="number" min={0} autoFocus value={editingStockVal}
+                                                            onChange={(e) => setEditingStockVal(Number(e.target.value))}
+                                                            onBlur={() => handleQuickStockSave(p.id)}
+                                                            onKeyDown={(e) => e.key === "Enter" && handleQuickStockSave(p.id)}
+                                                            style={{ width: 60, padding: "3px 6px", borderRadius: 4, border: "1px solid #D4AF37", fontSize: 12, textAlign: "center", fontFamily: "inherit" }} />
+                                                    ) : (
+                                                        <span onClick={() => { if (!inactive) { setEditingStockId(p.id); setEditingStockVal(p.stock); } }}
+                                                            style={{ cursor: inactive ? "default" : "pointer", borderBottom: inactive ? "none" : "1px dashed #ccc", color: lowStock ? "#c0392b" : inactive ? "#ccc" : "#3a7d44", fontWeight: 500 }}>
+                                                            {p.stock}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td style={styles.td}>
+                                                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500,
+                                                        background: inactive ? "#F5F5F4" : "#F0F7F1", color: inactive ? "#999" : "#3a7d44" }}>
+                                                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: inactive ? "#ccc" : "#3a7d44" }} />
+                                                        {inactive ? "Inactivo" : "Activo"}
+                                                    </span>
+                                                </td>
+                                                <td style={{ ...styles.td, verticalAlign: "middle" }}>
+                                                    <div className="actions-group" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                                        <button className="btn-icon-action" style={styles.btnIconAction} title="Ver detalle" onClick={() => setViewProduct(p)}>
+                                                            <i className="ti ti-eye" style={{ fontSize: 14 }} aria-hidden />
+                                                        </button>
+                                                        <button className="btn-icon-action" style={{ ...styles.btnIconAction, color: p.featured ? "#D4AF37" : "#888" }} title={p.featured ? "Quitar destacado" : "Destacar"} onClick={() => handleToggleFeatured(p.id)}>
+                                                            <i className="ti ti-star" style={{ fontSize: 14 }} aria-hidden />
+                                                        </button>
+                                                        {inactive ? (
+                                                            <button className="btn-icon-action" title="Reactivar" style={{ ...styles.btnIconAction, color: "#3a7d44" }}
+                                                                onClick={() => requestReactivate(p.id)}>
+                                                                <i className="ti ti-refresh" style={{ fontSize: 14 }} aria-hidden />
+                                                            </button>
+                                                        ) : (
+                                                            <>
+                                                                <button className="btn-icon-action" style={styles.btnIconAction} title="Editar" onClick={() => openEditProd(p)}>
+                                                                    <i className="ti ti-pencil" style={{ fontSize: 14 }} aria-hidden />
+                                                                </button>
+                                                                <button className="btn-icon-action" title="Desactivar" style={{ ...styles.btnIconAction, color: "#c0392b" }}
+                                                                    onClick={() => requestDeactivate(p.id)}>
+                                                                    <i className="ti ti-circle-off" style={{ fontSize: 14 }} aria-hidden />
+                                                                </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                    })}</tbody>
+                                </table>
+                                </div>
+                            </div>
                         ) : (
                             <div className="product-grid">
                                 {paginated.map((p) => {
                                     const inactive = p.status !== "active";
                                     const lowStock = p.stock <= 5 && !inactive;
+                                    const onSale = p.salePrice && p.salePrice > 0 && (!p.saleEndDate || new Date(p.saleEndDate) > new Date());
                                     return (
-                                        <div key={p.id} className={`product-card ${inactive ? "product-card-inactive" : ""}`}>
+                                        <div key={p.id} className={`product-card ${inactive ? "product-card-inactive" : ""} ${p.featured ? "product-card-featured" : ""}`}>
                                             <div className="product-card-img">
                                                 {p.image ? (
                                                     <img src={p.image} alt={p.name} style={inactive ? { filter: "grayscale(1)", opacity: 0.5 } : undefined} />
@@ -362,6 +651,12 @@ export default function StorePage() {
                                                     <div className="product-card-placeholder">
                                                         <i className="ti ti-photo" style={{ fontSize: 32, color: "#ddd" }} />
                                                     </div>
+                                                )}
+                                                {p.images && p.images.length > 1 && (
+                                                    <span className="product-card-multi" title="Múltiples imágenes"><i className="ti ti-gallery" /></span>
+                                                )}
+                                                {p.featured && !inactive && (
+                                                    <span className="product-card-featured-badge"><i className="ti ti-star" /></span>
                                                 )}
                                                 {inactive ? (
                                                     <span className="product-card-badge badge-inactive">Inactivo</span>
@@ -373,11 +668,21 @@ export default function StorePage() {
                                             </div>
                                             <div className="product-card-body">
                                                 <span className="product-card-category">{p.category}</span>
-                                                <h3 className="product-card-name">{p.name}</h3>
-                                                <p className="product-card-price">${p.price.toFixed(2)}</p>
+                                                <h3 className="product-card-name" title={p.description || ""}>{p.name}</h3>
+                                                {onSale ? (
+                                                    <p className="product-card-price">
+                                                        <span style={{ textDecoration: "line-through", color: "#bbb", fontSize: 11, marginRight: 4 }}>${p.price.toFixed(2)}</span>
+                                                        <span style={{ color: "#c0392b" }}>${p.salePrice.toFixed(2)}</span>
+                                                    </p>
+                                                ) : (
+                                                    <p className="product-card-price">${p.price.toFixed(2)}</p>
+                                                )}
                                                 <div className="product-card-actions">
                                                     <button className="btn-icon-action" style={styles.btnIconAction} title="Ver detalle" onClick={() => setViewProduct(p)}>
                                                         <i className="ti ti-eye" style={{ fontSize: 14 }} aria-hidden />
+                                                    </button>
+                                                    <button className="btn-icon-action" style={{ ...styles.btnIconAction, color: p.featured ? "#D4AF37" : "#888" }} title={p.featured ? "Quitar destacado" : "Destacar"} onClick={() => handleToggleFeatured(p.id)}>
+                                                        <i className="ti ti-star" style={{ fontSize: 14 }} aria-hidden />
                                                     </button>
                                                     {inactive ? (
                                                         <button className="btn-icon-action" title="Reactivar" style={{ ...styles.btnIconAction, color: "#3a7d44" }}
@@ -410,8 +715,8 @@ export default function StorePage() {
                     <>
                         {salesLoading ? (
                             <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
-                        ) : sales.length === 0 ? (
-                            <p style={styles.empty}>No hay ventas registradas.</p>
+                        ) : filteredSales.length === 0 ? (
+                            <p style={styles.empty}>{saleSearch || salePayFilter || saleStatusFilter ? "No hay ventas con esos filtros." : "No hay ventas registradas."}</p>
                         ) : (
                             <div style={{ ...styles.card, padding: 0 }}>
                                 <table style={styles.table}>
@@ -424,7 +729,7 @@ export default function StorePage() {
                                         <th style={styles.th}>Estado</th>
                                         <th style={styles.th}>Acciones</th>
                                     </tr></thead>
-                                    <tbody>{sales.map((s) => {
+                                    <tbody>{filteredSales.map((s) => {
                                         const returned = s.status === "returned";
                                         return (
                                             <tr key={s.id} style={styles.row}>
@@ -442,13 +747,19 @@ export default function StorePage() {
                                                         {returned ? "Devuelta" : "Completada"}
                                                     </span>
                                                 </td>
-                                                <td style={styles.td}>
-                                                    {!returned && (
-                                                        <button className="btn-icon-action" title="Devolver" style={{ ...styles.btnIconAction, color: "#c0392b" }}
-                                                            onClick={() => requestReturn(s.id)}>
-                                                            <i className="ti ti-receipt-refund" style={{ fontSize: 14 }} aria-hidden />
+                                                <td style={{ ...styles.td, verticalAlign: "middle" }}>
+                                                    <div className="actions-group" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                                        <button className="btn-icon-action" title="Imprimir ticket" style={styles.btnIconAction}
+                                                            onClick={() => printSaleTicket(s)}>
+                                                            <i className="ti ti-printer" style={{ fontSize: 14 }} aria-hidden />
                                                         </button>
-                                                    )}
+                                                        {!returned && (
+                                                            <button className="btn-icon-action" title="Devolver" style={{ ...styles.btnIconAction, color: "#c0392b" }}
+                                                                onClick={() => requestReturn(s.id)}>
+                                                                <i className="ti ti-receipt-refund" style={{ fontSize: 14 }} aria-hidden />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -475,10 +786,19 @@ export default function StorePage() {
                         <textarea style={styles.input} rows={2} value={prodForm.description} onChange={(e) => setProdForm((p) => ({ ...p, description: e.target.value }))} />
 
                         <label style={{ ...styles.label, marginTop: 12 }}>Precio</label>
-                        <input type="number" min={0} style={styles.input} value={prodForm.price} onChange={(e) => setProdForm((p) => ({ ...p, price: Number(e.target.value) }))} />
+                        <input type="number" min={0} style={styles.input} value={prodForm.price} onChange={(e) => setProdForm((p) => ({ ...p, price: Number(e.target.value) }))} onWheel={(e) => (e.target as HTMLElement).blur()} />
+
+                        <label style={{ ...styles.label, marginTop: 12 }}>Precio de oferta</label>
+                        <input type="number" min={0} style={styles.input} value={prodForm.salePrice || ""} onChange={(e) => setProdForm((p) => ({ ...p, salePrice: Number(e.target.value) }))} onWheel={(e) => (e.target as HTMLElement).blur()} placeholder="Opcional" />
+
+                        <label style={{ ...styles.label, marginTop: 12 }}>Precio original (tachado)</label>
+                        <input type="number" min={0} style={styles.input} value={prodForm.originalPrice || ""} onChange={(e) => setProdForm((p) => ({ ...p, originalPrice: Number(e.target.value) }))} onWheel={(e) => (e.target as HTMLElement).blur()} placeholder="Opcional" />
+
+                        <label style={{ ...styles.label, marginTop: 12 }}>Vigencia oferta (opcional)</label>
+                        <input type="date" style={styles.input} value={prodForm.saleEndDate} onChange={(e) => setProdForm((p) => ({ ...p, saleEndDate: e.target.value }))} />
 
                         <label style={{ ...styles.label, marginTop: 12 }}>Stock inicial</label>
-                        <input type="number" min={0} style={styles.input} value={prodForm.stock} onChange={(e) => setProdForm((p) => ({ ...p, stock: Number(e.target.value) }))} />
+                        <input type="number" min={0} style={styles.input} value={prodForm.stock} onChange={(e) => setProdForm((p) => ({ ...p, stock: Number(e.target.value) }))} onWheel={(e) => (e.target as HTMLElement).blur()} />
 
                         <label style={{ ...styles.label, marginTop: 12 }}>Categoría</label>
                         <input style={styles.input} value={prodForm.category} onChange={(e) => setProdForm((p) => ({ ...p, category: e.target.value }))} list="cat-list" placeholder="Ej: Proteínas" />
@@ -486,11 +806,49 @@ export default function StorePage() {
                             {allCategories.map((c) => <option key={c} value={c} />)}
                         </datalist>
 
-                        <label style={{ ...styles.label, marginTop: 12 }}>Imagen</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <button type="button" style={styles.imageBtn} onClick={() => prodImageRef.current?.click()}>
-                                <i className="ti ti-upload" style={{ fontSize: 14 }} aria-hidden /> Subir imagen
-                            </button>
+                        {/* Featured toggle */}
+                        <label style={{ ...styles.label, marginTop: 12 }}>Destacado</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, color: "#555" }}>
+                                <input type="checkbox" checked={prodForm.featured} onChange={(e) => setProdForm((p) => ({ ...p, featured: e.target.checked }))} />
+                                {prodForm.featured ? "Producto destacado (aparece primero)" : "Marcar como destacado"}
+                            </label>
+                        </div>
+
+                        <label style={{ ...styles.label, marginTop: 12 }}>Imágenes (hasta 3)</label>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {/* Existing images (edit mode) */}
+                            {editingProd && (products.find((p) => p.id === editingProd)?.images ?? []).map((imgUrl, idx) => (
+                                <div key={idx} style={{ position: "relative", display: "inline-block" }}>
+                                    <img src={imgUrl} alt={`img-${idx}`} style={{ width: 60, height: 60, borderRadius: 6, objectFit: "cover", border: "1px solid #E5E4E2" }} />
+                                    <button type="button" title="Eliminar imagen"
+                                        style={{ position: "absolute", top: -6, right: -6, background: "#c0392b", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}
+                                        onClick={async () => {
+                                            try {
+                                                await deleteProductImageByIndex(editingProd!, idx);
+                                                addToast("Imagen eliminada");
+                                                loadProducts();
+                                            } catch { addToast("Error al eliminar imagen", "error"); }
+                                        }}>
+                                        <i className="ti ti-x" />
+                                    </button>
+                                </div>
+                            ))}
+                            {/* Pending upload preview */}
+                            {prodImagePreview && (
+                                <div style={{ position: "relative", display: "inline-block" }}>
+                                    <img src={prodImagePreview} alt="preview" style={{ width: 60, height: 60, borderRadius: 6, objectFit: "cover", border: "1px solid #D4AF37" }} />
+                                    <button type="button" style={{ position: "absolute", top: -6, right: -6, background: "#c0392b", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}
+                                        onClick={() => { setProdImageFile(null); setProdImagePreview(null); }}>
+                                        <i className="ti ti-x" />
+                                    </button>
+                                </div>
+                            )}
+                            {(editingProd ? (products.find((p) => p.id === editingProd)?.images ?? []).length < 3 : !prodImagePreview) && (
+                                <button type="button" style={{ ...styles.imageBtn, width: 60, height: 60, justifyContent: "center", padding: 0 }} onClick={() => prodImageRef.current?.click()}>
+                                    <i className="ti ti-plus" style={{ fontSize: 18 }} />
+                                </button>
+                            )}
                             <input ref={prodImageRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
                                 onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -499,15 +857,6 @@ export default function StorePage() {
                                         setProdImagePreview(URL.createObjectURL(file));
                                     }
                                 }} />
-                            {prodImagePreview && (
-                                <div style={{ position: "relative", display: "inline-block" }}>
-                                    <img src={prodImagePreview} alt="preview" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover", border: "1px solid #E5E4E2" }} />
-                                    <button type="button" style={{ position: "absolute", top: -6, right: -6, background: "#c0392b", color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}
-                                        onClick={() => { setProdImageFile(null); setProdImagePreview(null); }}>
-                                        <i className="ti ti-x" />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                     <div style={styles.drawerFooter}>
@@ -566,38 +915,54 @@ export default function StorePage() {
                                 style={{ ...styles.tabBtn, background: saleBuyerType === "staff" ? "#1a1a1a" : "#F7F7F6", color: saleBuyerType === "staff" ? "#fff" : "#555" }}>
                                 Staff
                             </button>
+                            <button onClick={() => { setSaleBuyerType("other"); setSaleBuyerId(""); setSaleBuyerName(""); setSaleBuyerEmail(""); }}
+                                style={{ ...styles.tabBtn, background: saleBuyerType === "other" ? "#1a1a1a" : "#F7F7F6", color: saleBuyerType === "other" ? "#fff" : "#555" }}>
+                                Otro
+                            </button>
                         </div>
 
-                        {saleBuyerType === "member" ? (
-                            <>
-                                <label style={{ ...styles.label, marginTop: 8 }}>Miembro</label>
-                                <select style={styles.input} value={saleBuyerId} onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSaleBuyerId(val);
-                                    const m = members.find((m) => m.id === val);
-                                    if (m) setSaleBuyerName(m.fullName);
-                                }}>
-                                    <option value="">Seleccionar miembro…</option>
-                                    {members.map((m) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
-                                </select>
-                            </>
-                        ) : (
-                            <>
-                                <label style={{ ...styles.label, marginTop: 8 }}>Staff</label>
-                                <select style={styles.input} value={saleBuyerId} onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSaleBuyerId(val);
-                                    const u = staffUsers.find((u) => u.id === val);
-                                    if (u) setSaleBuyerName(u.fullName);
-                                }}>
-                                    <option value="">Seleccionar staff…</option>
-                                    {staffUsers.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                                </select>
-                            </>
+                        {saleBuyerType !== "other" && (
+                            <div style={{ position: "relative", marginTop: 8 }}>
+                                <label style={styles.label}>{saleBuyerType === "member" ? "Buscar miembro" : "Buscar staff"}</label>
+                                <input style={styles.input} placeholder="Escribe para buscar…" value={saleMemberSearch}
+                                    onChange={(e) => setSaleMemberSearch(e.target.value)} />
+                                {saleMemberSearch && (
+                                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #E5E4E2", borderRadius: 7, zIndex: 10, maxHeight: 180, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+                                        {(saleBuyerType === "member" ? members : staffUsers)
+                                            .filter((p) => p.fullName.toLowerCase().includes(saleMemberSearch.toLowerCase()))
+                                            .slice(0, 20)
+                                            .map((p) => (
+                                                <div key={p.id} onClick={() => {
+                                                    setSaleBuyerId(p.id);
+                                                    setSaleBuyerName(p.fullName);
+                                                    setSaleBuyerEmail(p.email ?? "");
+                                                    setSaleMemberSearch(p.fullName);
+                                                }} style={{ padding: "8px 11px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #F0F0EE", transition: "background 0.1s" }}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#F7F7F6")}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                                                    {p.fullName}
+                                                    {p.email && <span style={{ color: "#bbb", fontSize: 11, marginLeft: 6 }}>({p.email})</span>}
+                                                </div>
+                                            ))}
+                                        {(saleBuyerType === "member" ? members : staffUsers).filter((p) => p.fullName.toLowerCase().includes(saleMemberSearch.toLowerCase())).length === 0 && (
+                                            <div style={{ padding: "8px 11px", fontSize: 12, color: "#bbb" }}>Sin resultados</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
-                        <label style={{ ...styles.label, marginTop: 8 }}>Nombre del comprador</label>
-                        <input style={styles.input} value={saleBuyerName} onChange={(e) => setSaleBuyerName(e.target.value)} placeholder="Nombre" />
+                        <label style={{ ...styles.label, marginTop: saleBuyerType === "other" ? 8 : 44 }}>Nombre del comprador</label>
+                        <input style={styles.input} value={saleBuyerName}
+                            onChange={(e) => setSaleBuyerName(e.target.value)} placeholder={saleBuyerType === "other" ? "Nombre del cliente" : "O editable"} />
+
+                        {/* Email & send ticket */}
+                        <label style={{ ...styles.label, marginTop: 12 }}>Correo para ticket</label>
+                        <input style={styles.input} type="email" value={saleBuyerEmail} onChange={(e) => setSaleBuyerEmail(e.target.value)} placeholder="correo@ejemplo.com" />
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, color: "#555", cursor: "pointer" }}>
+                            <input type="checkbox" checked={sendTicketEmail} onChange={(e) => setSendTicketEmail(e.target.checked)} />
+                            Enviar ticket por correo
+                        </label>
 
                         {/* Payment */}
                         <label style={{ ...styles.label, marginTop: 12 }}>Método de pago</label>
@@ -634,27 +999,67 @@ export default function StorePage() {
 
             {/* View product detail */}
             {viewProduct && <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setViewProduct(null)}>
-                <div style={{ background: "#fff", borderRadius: 12, width: 420, maxWidth: "90vw", maxHeight: "85vh", overflow: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ position: "relative" }}>
-                        {viewProduct.image ? (
-                            <img src={viewProduct.image} alt={viewProduct.name} style={{ width: "100%", maxHeight: 300, objectFit: "contain", background: "#FAFAFA", padding: 16, boxSizing: "border-box" }} />
-                        ) : (
-                            <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F7F6" }}>
-                                <i className="ti ti-photo" style={{ fontSize: 48, color: "#ddd" }} />
-                            </div>
-                        )}
+                <div style={{ background: "#fff", borderRadius: 12, width: 440, maxWidth: "90vw", maxHeight: "85vh", overflow: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+                    {/* Image gallery */}
+                    <div style={{ position: "relative", background: "#FAFAFA" }}>
+                        {(() => {
+                            const detailImgs = viewProduct.images && viewProduct.images.length > 0
+                                ? viewProduct.images
+                                : viewProduct.image
+                                    ? [viewProduct.image]
+                                    : [];
+                            return detailImgs.length > 0 ? (
+                                <>
+                                    {detailImgs.map((imgUrl, idx) => (
+                                        <img key={idx} src={imgUrl} alt={`${viewProduct.name}-${idx}`} style={{ width: "100%", maxHeight: 260, objectFit: "contain", padding: 16, boxSizing: "border-box", display: idx === 0 ? "block" : "none" }} />
+                                    ))}
+                                    {detailImgs.length > 1 && (
+                                        <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>
+                                            {detailImgs.map((_, idx) => (
+                                                <span key={idx} style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", cursor: "pointer", opacity: 0.7 }} onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const parent = e.currentTarget.parentElement?.previousElementSibling as HTMLElement;
+                                                    const imgs = parent?.querySelectorAll?.("img");
+                                                    imgs?.forEach((img, i) => img.style.display = i === idx ? "block" : "none");
+                                                }} />
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div style={{ width: "100%", height: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F7F6" }}>
+                                    <i className="ti ti-photo" style={{ fontSize: 48, color: "#ddd" }} />
+                                </div>
+                            );
+                        })()}
                         <button onClick={() => setViewProduct(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", color: "#fff", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
                             <i className="ti ti-x" />
                         </button>
                     </div>
                     <div style={{ padding: "16px 20px 20px" }}>
-                        <span style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>{viewProduct.category}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>{viewProduct.category}</span>
+                            {viewProduct.featured && <i className="ti ti-star" style={{ fontSize: 12, color: "#D4AF37" }} />}
+                        </div>
                         <h2 style={{ fontSize: 17, fontWeight: 600, color: "#1a1a1a", margin: "4px 0 2px" }}>{viewProduct.name}</h2>
-                        <p style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: "4px 0 8px" }}>${viewProduct.price.toFixed(2)}</p>
+                        {viewProduct.salePrice && viewProduct.salePrice > 0 && (!viewProduct.saleEndDate || new Date(viewProduct.saleEndDate) > new Date()) ? (
+                            <p style={{ fontSize: 22, fontWeight: 700, color: "#c0392b", margin: "4px 0 8px" }}>
+                                <span style={{ textDecoration: "line-through", color: "#bbb", fontSize: 16, fontWeight: 400, marginRight: 6 }}>${viewProduct.price.toFixed(2)}</span>
+                                ${viewProduct.salePrice.toFixed(2)}
+                            </p>
+                        ) : (
+                            <p style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: "4px 0 8px" }}>${viewProduct.price.toFixed(2)}</p>
+                        )}
                         {viewProduct.description && <p style={{ fontSize: 12, color: "#888", margin: "0 0 10px", lineHeight: 1.4 }}>{viewProduct.description}</p>}
                         <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#555" }}>
                             <span><strong>Stock:</strong> {viewProduct.stock} uds.</span>
                             <span><strong>Estado:</strong> {viewProduct.status === "active" ? "Activo" : "Inactivo"}</span>
+                            {viewProduct.images && viewProduct.images.length > 0 && <span><strong>Imágenes:</strong> {viewProduct.images.length}</span>}
+                        </div>
+                        <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+                            <button style={{ ...styles.cancelBtn, fontSize: 11, padding: "6px 12px" }} onClick={() => { const p = viewProduct; setViewProduct(null); openEditProd(p); }}>
+                                <i className="ti ti-pencil" style={{ fontSize: 12, marginRight: 4 }} aria-hidden /> Editar producto
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -684,6 +1089,9 @@ export default function StorePage() {
                 }
                 .product-card-inactive:hover {
                     opacity: 0.8;
+                }
+                .product-card-featured {
+                    border-top-color: #D4AF37;
                 }
                 .product-card-img {
                     position: relative;
@@ -720,6 +1128,24 @@ export default function StorePage() {
                 .badge-ok { background: #3a7d44; }
                 .badge-low { background: #c0392b; }
                 .badge-inactive { background: #888; }
+                .product-card-multi {
+                    position: absolute;
+                    top: 6px;
+                    right: 6px;
+                    background: rgba(0,0,0,0.5);
+                    color: #fff;
+                    border-radius: 4px;
+                    padding: 2px 5px;
+                    font-size: 10px;
+                }
+                .product-card-featured-badge {
+                    position: absolute;
+                    top: 6px;
+                    left: 6px;
+                    color: #D4AF37;
+                    font-size: 16px;
+                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+                }
                 .product-card-body {
                     padding: 6px 8px 8px;
                     display: flex;
@@ -762,18 +1188,21 @@ export default function StorePage() {
                     border-color: #E5E4E2 !important;
                     color: #1a1a1a !important;
                 }
+                .store-row { transition: background 0.1s ease; }
+                .store-row:hover { background: #FAFAFA; }
+                .store-row:last-child td { border-bottom: none !important; }
+                .actions-group { opacity: 0.4; transition: opacity 0.15s; }
+                .store-row:hover .actions-group { opacity: 1; }
+                .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                .table-scroll table { min-width: 600px; }
                 @media (max-width: 1100px) {
                     .product-grid { grid-template-columns: repeat(4, 1fr); }
-                }
-                @media (max-width: 800px) {
-                    .product-grid { grid-template-columns: repeat(2, 1fr); }
                 }
                 @media (max-width: 900px) {
                     .product-grid { grid-template-columns: repeat(2, 1fr); }
                     .store-page > div:first-child { padding: 14px 20px 12px !important; }
                     .toolbar-wrap { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
                     .toolbar-wrap .search-wrap { flex: none !important; width: 100% !important; }
-                    .filter-group { width: 100% !important; }
                     .toolbar-card { padding: 8px 10px !important; }
                     .store-content { padding: 6px 14px 20px !important; gap: 6px !important; }
                 }
@@ -829,4 +1258,5 @@ const styles: Record<string, React.CSSProperties> = {
     addBtn: { background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 7, width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
     tabBtn: { padding: "6px 14px", borderRadius: 20, border: "1px solid #E5E4E2", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", transition: "background 0.12s" },
     imageBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 7, background: "#F7F7F6", border: "1px solid #E5E4E2", fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", color: "#555", transition: "background 0.12s" },
+    viewToggleBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, border: "1px solid #E5E4E2", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", transition: "all 0.12s" },
 };

@@ -7,6 +7,7 @@ export interface Sale {
     buyerType: string;
     buyerId?: string;
     buyerName: string;
+    buyerEmail?: string;
     paymentMethod: string;
     status: string;
     registeredBy: string;
@@ -20,6 +21,7 @@ interface CreateSaleData {
     buyerType: string;
     buyerId?: string;
     buyerName: string;
+    buyerEmail?: string;
     paymentMethod: string;
 }
 

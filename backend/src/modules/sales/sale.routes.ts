@@ -10,6 +10,6 @@ const router = Router();
 router.get("/", authenticate, authorize("admin", "receptionist"), getAll);
 router.get("/:id", authenticate, authorize("admin", "receptionist"), getById);
 router.post("/", authenticate, authorize("admin", "receptionist"), validate(createSaleSchema), create);
-router.post("/:id/return", authenticate, authorize("admin", "receptionist"), validate(returnSaleSchema), returnSaleHandler);
+router.post("/:id/return", authenticate, authorize("admin", "receptionist"), returnSaleHandler);
 
 export default router;

@@ -7,6 +7,7 @@ export interface SaleResponse {
     buyerType: string;
     buyerId?: string;
     buyerName: string;
+    buyerEmail?: string;
     paymentMethod: string;
     status: string;
     registeredBy: string;
@@ -26,6 +27,7 @@ export const toSaleResponse = (sale: ISale): SaleResponse => ({
     buyerType: sale.buyerType,
     buyerId: sale.buyerId?.toString(),
     buyerName: sale.buyerName,
+    buyerEmail: sale.buyerEmail,
     paymentMethod: sale.paymentMethod,
     status: sale.status,
     registeredBy: sale.registeredBy.toString(),

@@ -4,8 +4,12 @@ import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 
 export const getAll = asyncHandler(
     async (req: Request, res: Response) => {
-        const entity = req.query.entity as string | undefined;
-        const logs = await getAuditLogs(entity);
+        const logs = await getAuditLogs({
+            entity: req.query.entity as string | undefined,
+            role: req.query.role as string | undefined,
+            dateFrom: req.query.dateFrom as string | undefined,
+            dateTo: req.query.dateTo as string | undefined,
+        });
 
         const data = logs.map((log) => ({
             id: log._id.toString(),

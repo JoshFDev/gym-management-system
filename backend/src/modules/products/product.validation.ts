@@ -8,6 +8,10 @@ export const createProductSchema = z.object({
     stock: z.number().int().min(0, "El stock no puede ser negativo"),
     category: z.string().trim().min(1, "La categoría es obligatoria"),
     status: z.enum(ProductStatus).optional(),
+    featured: z.boolean().optional(),
+    originalPrice: z.number().min(0).optional(),
+    salePrice: z.number().min(0).optional(),
+    saleEndDate: z.string().datetime().optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

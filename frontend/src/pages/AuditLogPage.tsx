@@ -22,6 +22,14 @@ const ENTITY_LABEL: Record<string, string> = {
     Attendance: "Asistencia",
     User: "Usuario",
     ClassSchedule: "Clase",
+    Product: "Producto",
+    Sale: "Venta",
+};
+
+const ROLE_LABEL: Record<string, string> = {
+    admin: "Administrador",
+    receptionist: "Recepcionista",
+    trainer: "Entrenador",
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -49,45 +57,78 @@ export default function AuditLogPage() {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [entityFilter, setEntityFilter] = useState("");
+    const [roleFilter, setRoleFilter] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+
+    const load = () => {
+        setLoading(true);
+        getAuditLogs({
+            entity: entityFilter || undefined,
+            role: roleFilter || undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
+        })
+            .then((res) => setLogs(res.data ?? []))
+            .catch(() => setLogs([]))
+            .finally(() => setLoading(false));
+    };
 
     useEffect(() => {
-        const load = async () => {
-            setLoading(true);
-            try {
-                const res = await getAuditLogs(entityFilter || undefined);
-                setLogs(res.data ?? []);
-            } catch {
-                setLogs([]);
-            } finally {
-                setLoading(false);
-            }
-        };
         load();
-    }, [entityFilter]);
-
-    const uniqueEntities = [...new Set(logs.map((l) => l.entity))];
+    }, [entityFilter, roleFilter, dateFrom, dateTo]);
 
     return (
         <div style={s.page}>
             <PageHeader title="Auditoría" />
             <div style={s.content}>
                 <div className="toolbar-card" style={s.toolbarCard}>
-                <div className="toolbar-wrap" style={s.toolbar}>
-                    <div className="filter-group" style={s.filterGroup}>
-                        <select
-                            value={entityFilter}
-                            onChange={(e) => setEntityFilter(e.target.value)}
-                            style={{ ...s.filterSelect }}
-                        >
-                            <option value="">Todas las entidades</option>
-                            {uniqueEntities.map((e) => (
-                                <option key={e} value={e}>
-                                    {ENTITY_LABEL[e] ?? e}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="toolbar-wrap" style={s.toolbar}>
+                        <div className="filter-group" style={s.filterGroup}>
+                            <select
+                                value={entityFilter}
+                                onChange={(e) => setEntityFilter(e.target.value)}
+                                style={s.filterSelect}
+                            >
+                                <option value="">Todas las entidades</option>
+                                {Object.entries(ENTITY_LABEL).map(([k, v]) => (
+                                    <option key={k} value={k}>{v}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={roleFilter}
+                                onChange={(e) => setRoleFilter(e.target.value)}
+                                style={s.filterSelect}
+                            >
+                                <option value="">Todos los roles</option>
+                                {Object.entries(ROLE_LABEL).map(([k, v]) => (
+                                    <option key={k} value={k}>{v}</option>
+                                ))}
+                            </select>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                style={{ ...s.filterSelect, maxWidth: 160 }}
+                                title="Desde"
+                            />
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                style={{ ...s.filterSelect, maxWidth: 160 }}
+                                title="Hasta"
+                            />
+                            {(entityFilter || roleFilter || dateFrom || dateTo) && (
+                                <button
+                                    onClick={() => { setEntityFilter(""); setRoleFilter(""); setDateFrom(""); setDateTo(""); }}
+                                    style={{ ...s.clearBtn }}
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
                     </div>
-                </div>
                 </div>
                 {loading ? (
                     <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>
@@ -133,7 +174,7 @@ export default function AuditLogPage() {
                                                 <span style={s.muted}>—</span>
                                             )}
                                         </td>
-                                        <td style={s.td}>{log.userRole}</td>
+                                        <td style={s.td}>{ROLE_LABEL[log.userRole] ?? log.userRole}</td>
                                         <td style={{ ...s.td, ...s.muted, fontSize: 12 }}>
                                             {fmtDate(log.createdAt)}
                                         </td>
@@ -180,10 +221,13 @@ const s: Record<string, React.CSSProperties> = {
     empty:   { fontSize: 13, color: "#bbb", padding: "40px 0", textAlign: "center" },
     filterSelect: {
         background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 13px",
-        fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit", maxWidth: 220,
+        fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit",
+    },
+    clearBtn: {
+        background: "none", border: "1px solid #E5E4E2", borderRadius: 7, padding: "9px 14px",
+        fontSize: 12, color: "#c0392b", fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap",
     },
     toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
     toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
     filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },
-    exportGroup: { display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" as const },
 };

@@ -19,7 +19,7 @@ export const getProductById = async (id: string) => {
     return product;
 };
 
-export const updateProduct = async (id: string, data: UpdateProductInput & { image?: string }) => {
+export const updateProduct = async (id: string, data: UpdateProductInput & { image?: string; images?: string[] }) => {
     const product = await Product.findByIdAndUpdate(id, data, { returnDocument: "after", runValidators: true });
     if (!product) throw new NotFoundError("Producto no encontrado");
     return product;
@@ -40,4 +40,12 @@ export const reactivateProduct = async (id: string) => {
 export const getCategories = async () => {
     const categories = await Product.distinct("category", { status: ProductStatus.ACTIVE });
     return categories;
+};
+
+export const toggleFeatured = async (id: string) => {
+    const product = await Product.findById(id);
+    if (!product) throw new NotFoundError("Producto no encontrado");
+    product.featured = !product.featured;
+    await product.save();
+    return product;
 };

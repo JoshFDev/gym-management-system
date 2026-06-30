@@ -14,6 +14,7 @@ export interface ISale extends Document {
     buyerType: BuyerType;
     buyerId?: Types.ObjectId;
     buyerName: string;
+    buyerEmail?: string;
     paymentMethod: PaymentMethod;
     status: SaleStatus;
     registeredBy: Types.ObjectId;
@@ -38,6 +39,7 @@ const saleSchema = new Schema<ISale>(
         buyerType: { type: String, enum: Object.values(BuyerType), required: true },
         buyerId: { type: Schema.Types.ObjectId },
         buyerName: { type: String, required: true },
+        buyerEmail: { type: String },
         paymentMethod: { type: String, enum: Object.values(PaymentMethod), required: true },
         status: { type: String, enum: Object.values(SaleStatus), default: SaleStatus.COMPLETED },
         registeredBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
