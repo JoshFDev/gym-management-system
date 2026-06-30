@@ -1,10 +1,16 @@
-import { Response, NextFunction } from "express";
+import { type Request, Response, NextFunction } from "express";
 import User from "../../modules/auth/auth.model";
 
 import { verifyToken } from "../../utils/jwt";
 import { UnauthorizedError } from "../errors/UnauthorizedError";
 import { asyncHandler } from "./asyncHandler";
-import type { AuthRequest } from "./authenticate";
+
+export interface AuthRequest extends Request {
+    user?: {
+        userId: string;
+        role: string;
+    };
+}
 
 export interface AuthRequest {
     user?: {

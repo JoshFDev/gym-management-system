@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import { Chart, registerables } from "chart.js";
@@ -7,8 +7,8 @@ import GymButton from "../components/GymButton";
 import { getDashboardStats } from "../services/dashboard.service";
 import { getMembers } from "../services/member.service";
 import { getPayments } from "../services/payment.service";
-//import { getPlans } from "../services/plan.service";
 import { getAttendances, getActiveAttendances } from "../services/attendance.service";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 Chart.register(...registerables);
 
@@ -188,35 +188,41 @@ export default function DashboardPage() {
     const [activeMembers, setActiveMembers] = useState<ActiveMember[]>([]);
     const [statusFilter, setStatusFilter] = useState<"todos" | "gym" | "fuera">("todos");
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const [
-                    statsRes,
-                    membersRes,
-                    paymentsRes,
-                    attendanceRes,
-                    activeRes,
-                ] = await Promise.all([
-                    getDashboardStats(),
-                    getMembers(),
-                    getPayments(),
-                    getAttendances(),
-                    getActiveAttendances(),
-                ]);
-                setStats(statsRes.data);
-                setMembers(membersRes.data ?? []);
-                setPayments((paymentsRes.data ?? []).slice(0, 3));
-                setWeekData(buildWeekData(attendanceRes.data ?? [], paymentsRes.data ?? []));
-                setActiveMembers(activeRes.data ?? []);
-            } catch (err) {
-                console.error("Dashboard error:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+    const load = useCallback(async () => {
+        try {
+            const [
+                statsRes,
+                membersRes,
+                paymentsRes,
+                attendanceRes,
+                activeRes,
+            ] = await Promise.all([
+                getDashboardStats(),
+                getMembers(),
+                getPayments(),
+                getAttendances(),
+                getActiveAttendances(),
+            ]);
+            setStats(statsRes.data);
+            setMembers(membersRes.data ?? []);
+            setPayments((paymentsRes.data ?? []).slice(0, 3));
+            setWeekData(buildWeekData(attendanceRes.data ?? [], paymentsRes.data ?? []));
+            setActiveMembers(activeRes.data ?? []);
+        } catch (err) {
+            console.error("Dashboard error:", err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    useSocketRefresh([
+        "member_created", "member_updated", "member_deactivated", "member_deleted",
+        "payment_created", "payment_refunded",
+        "attendance_created",
+        "subscription_created", "subscription_renewed", "subscription_cancelled",
+    ], () => { setLoading(true); load(); });
 
     if (loading) return <div style={{ padding: "20px 14px" }}><LoadingSkeleton rows={5} /></div>;
     if (!stats) return <p style={{ padding: 40, color: "#bbb", fontSize: 13 }}>Error al cargar datos.</p>;

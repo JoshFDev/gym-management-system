@@ -21,13 +21,20 @@ import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import AuditLogPage from "../pages/AuditLogPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import MemberCatalogPage from "../pages/member/MemberCatalogPage";
+import { getStoredToken } from "../hooks/useAuth";
+
+function RootRedirect() {
+    return getStoredToken()
+        ? <Navigate to="/dashboard" replace />
+        : <Navigate to="/login" replace />;
+}
 
 export default function AppRouter() {
     return (
         <ErrorBoundary>
             <BrowserRouter>
                 <Routes>
-                    <Route path="/" element={<Navigate to="/login" />} />
+                    <Route path="/" element={<RootRedirect />} />
 
                     {/* ── Rutas públicas ── */}
                     <Route path="/login"              element={<LoginPage />} />

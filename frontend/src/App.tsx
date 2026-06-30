@@ -1,11 +1,14 @@
+import ErrorBoundary from "./components/ErrorBoundary";
 import AppRouter from "./routes/AppRouter";
 import { ToastProvider } from "./components/ToastProvider";
 
 function App() {
     return (
-        <ToastProvider>
-            <AppRouter />
-        </ToastProvider>
+        <ErrorBoundary>
+            <ToastProvider>
+                <AppRouter />
+            </ToastProvider>
+        </ErrorBoundary>
     );
 }
 
