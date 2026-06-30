@@ -4,6 +4,7 @@ import { toUserResponse } from "./auth.dto";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { AuthRequest } from "../../shared/middlewares/authenticate";
+import { logAudit } from "../auditLog/auditLog.service";
 import {
     registerUser,
     loginUser,
@@ -16,6 +17,14 @@ export const register = asyncHandler(
     async (req: Request, res: Response) => {
 
         const user = await registerUser(req.body);
+
+        logAudit({
+            action: "CREATE",
+            entity: "User",
+            entityId: user._id.toString(),
+            userId: user._id.toString(),
+            userRole: user.role,
+        }).catch(() => {});
 
         res.status(201).json({
             success: true,
@@ -30,6 +39,15 @@ export const login = asyncHandler(
     async (req: Request, res: Response) => {
 
         const { token, user } = await loginUser(req.body);
+
+        logAudit({
+            action: "UPDATE",
+            entity: "User",
+            entityId: user._id.toString(),
+            userId: user._id.toString(),
+            userRole: user.role,
+            changes: { action: "login" },
+        }).catch(() => {});
 
         res.status(200).json({
             success: true,
@@ -99,6 +117,15 @@ export const changePasswordHandler = asyncHandler(
     async (req: AuthRequest, res: Response) => {
 
         await changePassword(req.user!.userId, req.body);
+
+        logAudit({
+            action: "UPDATE",
+            entity: "User",
+            entityId: req.user!.userId,
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+            changes: { action: "change_password" },
+        }).catch(() => {});
 
         res.status(200).json({
             success: true,

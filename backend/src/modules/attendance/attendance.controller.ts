@@ -11,14 +11,24 @@ import {
 import { toAttendanceResponse } from "./attendance.dto";
 
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
+import { AuthRequest } from "../../shared/middlewares/authenticate";
+import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
 
 export const create = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req: AuthRequest, res: Response) => {
 
         const { attendance, action } = await createAttendance(
             req.body
         );
+
+        logAudit({
+            action: "CREATE",
+            entity: "Attendance",
+            entityId: attendance._id.toString(),
+            userId: req.user!.userId,
+            userRole: req.user!.role,
+        }).catch(() => {});
 
         notifyAll({
             type: "attendance_created",
@@ -84,10 +94,19 @@ export const report = asyncHandler(
 );
 
 export const checkoutAll = asyncHandler(
-    async (_req: Request, res: Response) => {
+    async (req: AuthRequest, res: Response) => {
         const count = await checkoutAllAttendances();
 
         if (count > 0) {
+            logAudit({
+                action: "UPDATE",
+                entity: "Attendance",
+                entityId: "bulk",
+                userId: req.user!.userId,
+                userRole: req.user!.role,
+                changes: { checkedOut: count },
+            }).catch(() => {});
+
             notifyAll({
                 type: "attendance_created",
                 title: "Salidas registradas",
