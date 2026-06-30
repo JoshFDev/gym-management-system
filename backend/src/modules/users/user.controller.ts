@@ -68,7 +68,7 @@ export const update = asyncHandler(
 
 export const remove = asyncHandler(
     async (req: AuthRequest, res: Response) => {
-        const user = await deleteUser(req.params.id as string);
+        const { user, deleted } = await deleteUser(req.params.id as string);
 
         await logAudit({
             action: "DELETE",
@@ -80,22 +80,24 @@ export const remove = asyncHandler(
 
         notifyAdmins({
             type: "user_deactivated",
-            title: "Usuario desactivado",
-            message: `${user.firstName} ${user.lastName} fue desactivado por ${req.user!.role}`,
+            title: deleted ? "Usuario eliminado" : "Usuario desactivado",
+            message: deleted
+                ? `${user.firstName} ${user.lastName} fue eliminado del sistema por ${req.user!.role}`
+                : `${user.firstName} ${user.lastName} fue desactivado por ${req.user!.role}`,
             userId: user._id.toString(),
             timestamp: new Date().toISOString(),
         });
 
         res.status(200).json({
             success: true,
-            message: "Usuario desactivado exitosamente.",
+            message: deleted ? "Usuario eliminado exitosamente." : "Usuario desactivado exitosamente.",
             data: {
                 id: user._id.toString(),
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
                 role: user.role,
-                isActive: user.isActive,
+                isActive: false,
             },
         });
     }

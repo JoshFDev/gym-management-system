@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { create, getAll, getById, deactivate, remove } from "./member.controller";
+import { create, getAll, getById, deactivate, remove, sendQREmail } from "./member.controller";
 
 import { validate } from "../../middlewares/validate.middleware";
 
@@ -58,6 +58,13 @@ router.delete(
     authenticate,
     authorize("admin"),
     remove
+);
+
+router.post(
+    "/:id/send-qr",
+    authenticate,
+    authorize("admin", "receptionist"),
+    sendQREmail
 );
 
 export default router;

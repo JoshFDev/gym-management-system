@@ -5,7 +5,7 @@ import { toPaymentResponse } from "./payment.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
-import { sendMail } from "../../shared/utils/mail.util";
+import { sendMail, buildEmailHtml } from "../../shared/utils/mail.util";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -21,7 +21,15 @@ export const create = asyncHandler(
             sendMail(
                 memberEmail,
                 "Confirmación de pago - ZenithGym",
-                `<p>Gracias por tu pago.</p><p>Plan: ${planName}</p><p>Monto: $${amount}</p><p>Fecha de fin de suscripción: ${endDate}</p>`
+                buildEmailHtml(`
+                    <p style="color: #333; font-size: 15px; margin: 0 0 16px;">¡Gracias por tu pago!</p>
+                    <table style="width:100%; border-collapse:collapse; font-size: 13px; color: #555;">
+                        <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Plan</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">${planName}</td></tr>
+                        <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Monto</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">$${amount}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #888;">Vigencia hasta</td><td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">${endDate}</td></tr>
+                    </table>
+                    <p style="color: #888; font-size: 12px; margin: 16px 0 0;">Si tienes dudas, contacta a la recepción de ZenithGym.</p>
+                `)
             ).catch(() => {});
         }
 

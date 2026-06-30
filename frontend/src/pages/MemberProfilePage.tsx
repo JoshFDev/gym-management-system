@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { getMemberById } from "../services/member.service";
+import { getMemberById, sendQRCodeEmail } from "../services/member.service";
 import { getAttendances } from "../services/attendance.service";
 import { getPayments } from "../services/payment.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
+import { useToast } from "../hooks/useToast";
 
 interface Member {
     id: string; firstName: string; lastName: string; email?: string; phone: string;
@@ -57,6 +58,7 @@ const downloadQR = (name: string) => {
 export default function MemberProfilePage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { addToast } = useToast();
     const [member, setMember] = useState<Member | null>(null);
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -154,6 +156,17 @@ export default function MemberProfilePage() {
                                 <i className="ti ti-download" style={{ fontSize: 13 }} aria-hidden />
                                 Descargar QR
                             </button>
+                            {member.email && (
+                                <button style={{ ...s.downloadBtn, marginTop: 8 }} onClick={async () => {
+                                    try {
+                                        await sendQRCodeEmail(member.id);
+                                        addToast("QR enviado al correo del miembro");
+                                    } catch { addToast("No se pudo enviar el QR", "error"); }
+                                }}>
+                                    <i className="ti ti-mail" style={{ fontSize: 13 }} aria-hidden />
+                                    Enviar QR por correo
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

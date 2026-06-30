@@ -17,6 +17,6 @@ export function useSocketRefresh(
                 savedCallback.current();
             }
         });
-        return unsub;
+        return () => { unsub(); };
     }, []);
 }

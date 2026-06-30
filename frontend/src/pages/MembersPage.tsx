@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QRCodeSVG } from "qrcode.react";
-import { createMember, getMembers, updateMember, deleteMember } from "../services/member.service";
+import { createMember, getMembers, updateMember, deleteMember, sendQRCodeEmail } from "../services/member.service";
 import PageHeader from "../components/PageHeader";
 import GymButton from "../components/GymButton";
 import Pagination from "../components/Pagination";
@@ -31,7 +31,7 @@ interface Member {
     updatedAt: string;
 }
 
-interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string; password?: string; birthDate?: string }
+interface FormErrors { firstName?: string; lastName?: string; phone?: string; email?: string; birthDate?: string }
 
 const statusLabel: Record<string, string> = { active: "Activo", inactive: "Inactivo" };
 const genderLabel: Record<string, string> = { male: "Masculino", female: "Femenino", other: "Otro" };
@@ -53,7 +53,6 @@ const validate = (values: Record<string, string>): FormErrors => {
     if (!values.phone.trim()) e.phone = "Obligatorio";
     else if (values.phone.replace(/\D/g, "").length < 10) e.phone = "Formato: XX-XXXX-XXXX";
     if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) e.email = "Correo inválido";
-    if (values.password && values.password.length < 6) e.password = "Mínimo 6 caracteres";
     if (values.birthDate) {
         const birth = new Date(values.birthDate);
         const today = new Date();
@@ -142,11 +141,6 @@ function MemberDrawer({ open, editingId, saving, values, errors, touched, onChan
                             type="email" placeholder="correo@ejemplo.com" value={values.email}
                             onChange={(e) => onChange("email", e.target.value)} onBlur={() => onBlur("email")} />
                     </Field>
-                    <Field label="Contraseña" error={errors.password} touched={touched.password}>
-                        <input style={{ ...s.input, ...(touched.password && errors.password ? s.inputError : {}) }}
-                            type="password" placeholder="••••••••" value={values.password}
-                            onChange={(e) => onChange("password", e.target.value)} onBlur={() => onBlur("password")} />
-                    </Field>
                     <Field label="Dirección">
                         <input style={s.input} placeholder="Calle, colonia, ciudad..." value={values.address} onChange={(e) => onChange("address", e.target.value)} />
                     </Field>
@@ -177,8 +171,8 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
     return <div style={sd.row}><span style={sd.label}>{label}</span><span style={sd.value}>{value}</span></div>;
 }
 
-function MemberDetailDrawer({ member, open, onClose, onEdit }: {
-    member: Member | null; open: boolean; onClose: () => void; onEdit: () => void;
+function MemberDetailDrawer({ member, open, onClose, onEdit, addToast }: {
+    member: Member | null; open: boolean; onClose: () => void; onEdit: () => void; addToast: (msg: string, type?: "success" | "error") => void;
 }) {
     const navigate = useNavigate();
     useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
@@ -262,6 +256,17 @@ function MemberDetailDrawer({ member, open, onClose, onEdit }: {
                                 }}>
                                 <i className="ti ti-download" style={{ fontSize: 13 }} aria-hidden />Descargar QR
                             </button>
+                            {member.email && (
+                                <button style={{ ...s.btnAction, marginTop: 8, background: "none", color: "#555", borderColor: "#E5E4E2", gap: 6 }}
+                                    onClick={async () => {
+                                        try {
+                                            await sendQRCodeEmail(member.id);
+                                            addToast("QR enviado al correo del miembro");
+                                        } catch { addToast("No se pudo enviar el QR", "error"); }
+                                    }}>
+                                    <i className="ti ti-mail" style={{ fontSize: 13 }} aria-hidden />Enviar QR por correo
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -332,7 +337,7 @@ const playConfirmSound = () => {
     } catch { /* ignore */ }
 };
 
-const emptyForm = { firstName: "", lastName: "", email: "", password: "", phone: "", gender: "", birthDate: "", address: "", emergencyContact: "", notes: "" };
+const emptyForm = { firstName: "", lastName: "", email: "", phone: "", gender: "", birthDate: "", address: "", emergencyContact: "", notes: "" };
 
 export default function MembersPage() {
     const [members, setMembers] = useState<Member[]>([]);
@@ -373,7 +378,7 @@ export default function MembersPage() {
         setTotalPages(res.totalPages ?? 1);
     }, [debouncedSearch, filterStatus, filterGender]);
 
-    useSocketRefresh(["member_created", "member_updated", "member_deactivated"], () => loadMembers(page));
+    useSocketRefresh(["member_created", "member_updated", "member_deactivated", "member_deleted"], () => loadMembers(page));
 
     useEffect(() => { (async () => { try { await loadMembers(page); } catch { /* handled in loadMembers */ } finally { setLoading(false); } })(); }, [loadMembers, page]);
 
@@ -384,7 +389,7 @@ export default function MembersPage() {
 
     const openEdit = (m: Member) => {
         setEditingId(m.id);
-        setFormValues({ firstName: m.firstName, lastName: m.lastName, email: m.email ?? "", password: "", phone: m.phone, gender: m.gender ?? "", birthDate: m.birthDate ? m.birthDate.slice(0, 10) : "", address: m.address ?? "", emergencyContact: m.emergencyContact ?? "", notes: m.notes ?? "" });
+        setFormValues({ firstName: m.firstName, lastName: m.lastName, email: m.email ?? "", phone: m.phone, gender: m.gender ?? "", birthDate: m.birthDate ? m.birthDate.slice(0, 10) : "", address: m.address ?? "", emergencyContact: m.emergencyContact ?? "", notes: m.notes ?? "" });
         setErrors({}); setTouched({}); setDrawerOpen(true);
     };
 
@@ -402,8 +407,8 @@ export default function MembersPage() {
         if (Object.keys(validation).length > 0) return;
         setSaving(true);
         try {
-            const { firstName, lastName, email, password, phone, gender, birthDate, address, emergencyContact, notes } = formValues;
-            const data = { firstName, lastName, phone, ...(email && { email }), ...(password && { password }), ...(gender && { gender }), ...(birthDate && { birthDate }), ...(address && { address }), ...(emergencyContact && { emergencyContact }), ...(notes && { notes }) };
+            const { firstName, lastName, email, phone, gender, birthDate, address, emergencyContact, notes } = formValues;
+            const data = { firstName, lastName, phone, ...(email && { email }), ...(gender && { gender }), ...(birthDate && { birthDate }), ...(address && { address }), ...(emergencyContact && { emergencyContact }), ...(notes && { notes }) };
             if (editingId) { await updateMember(editingId, data); addToast("Miembro actualizado"); }
             else { await createMember(data); addToast("Miembro creado correctamente"); }
             setDrawerOpen(false); await loadMembers(page);
@@ -440,7 +445,7 @@ export default function MembersPage() {
             <ConfirmModal open={bulkConfirmOpen}
                 title={allInactive ? "Eliminar miembros" : "Desactivar miembros"}
                 body={allInactive
-                    ? `¿Eliminar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Solo se eliminarán los que no tengan una suscripción activa.`
+                    ? `¿Eliminar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""} permanentemente? Los miembros con suscripción activa no se eliminarán.`
                     : `¿Desactivar ${selectedIds.length} miembro${selectedIds.length !== 1 ? "s" : ""} seleccionado${selectedIds.length !== 1 ? "s" : ""}? Perderán acceso al gimnasio.`}
                 confirmLabel={allInactive ? "Sí, eliminar" : "Sí, desactivar"}
                 confirmColor={allInactive ? "#c0392b" : "#854F0B"}
@@ -473,7 +478,7 @@ export default function MembersPage() {
                 }}
                 onCancel={() => setBulkConfirmOpen(false)} />
             <MemberDetailDrawer member={viewMember} open={!!viewMember} onClose={() => setViewMember(null)}
-                onEdit={() => { if (viewMember) { openEdit(viewMember); setViewMember(null); } }} />
+                onEdit={() => { if (viewMember) { openEdit(viewMember); setViewMember(null); } }} addToast={addToast} />
             <MemberDrawer open={drawerOpen} editingId={editingId} saving={saving} values={formValues} errors={errors} touched={touched}
                 onChange={handleFieldChange} onBlur={handleBlur} onSubmit={handleSubmit} onClose={() => setDrawerOpen(false)} />
             <PageHeader title="Miembros" action={<GymButton icon="ti-plus" onClick={openNew}>Nuevo miembro</GymButton>} />
@@ -649,7 +654,7 @@ const s: Record<string, React.CSSProperties> = {
     fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
     fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
     input: { background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 7, padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none", width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, transition: "border-color 0.15s" },
-    inputError: { borderColor: "#fecaca" },
+    inputError: { border: "1px solid #fecaca" },
     toolbarCard: { background: "#fff", border: "1px solid #E5E4E2", borderRadius: 8, padding: "12px 16px", borderTop: "2px solid #D4AF37" },
     toolbar: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const },
     filterGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const },

@@ -30,7 +30,7 @@ function playSuccessSound() {
 
 function playForgotSound() {
     try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         if (ctx.state === "suspended") ctx.resume();
         const t = ctx.currentTime;
         const g = ctx.createGain();

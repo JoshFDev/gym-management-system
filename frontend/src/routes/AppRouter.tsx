@@ -2,6 +2,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import DashboardLayout from "../layouts/DashboardLayout";
+import MemberLayout from "../layouts/MemberLayout";
 import LoginPage from "../pages/LoginPage";
 import DashboardPage from "../pages/DashboardPage";
 import MembersPage from "../pages/MembersPage";
@@ -19,6 +20,7 @@ import ResetPasswordPage from "../pages/ResetPasswordPage";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import AuditLogPage from "../pages/AuditLogPage";
 import NotFoundPage from "../pages/NotFoundPage";
+import MemberCatalogPage from "../pages/member/MemberCatalogPage";
 
 export default function AppRouter() {
     return (
@@ -33,7 +35,12 @@ export default function AppRouter() {
                     <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
                     <Route path="/unauthorized"       element={<UnauthorizedPage />} />
 
-                    {/* ── Rutas protegidas ── */}
+                    {/* ── Catálogo público (sin autenticación) ── */}
+                    <Route element={<MemberLayout />}>
+                        <Route path="/miembro/catalogo" element={<MemberCatalogPage />} />
+                    </Route>
+
+                    {/* ── Rutas protegidas (admin/recep/trainer) ── */}
                     <Route element={
                         <ProtectedRoute>
                             <DashboardLayout />

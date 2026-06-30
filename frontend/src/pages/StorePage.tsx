@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { getProducts, createProduct, updateProduct, deactivateProduct, reactivateProduct, getCategories, uploadProductImage, deleteProductImageByIndex, toggleProductFeatured, type Product } from "../services/product.service";
+import { getProducts, createProduct, updateProduct, deactivateProduct, reactivateProduct, uploadProductImage, deleteProductImageByIndex, toggleProductFeatured, type Product } from "../services/product.service";
 import { getSales, createSale, returnSale, type Sale } from "../services/sale.service";
 import { getMembers } from "../services/member.service";
-import { getUsers } from "../services/user.service";
+import { getUsers, type UserResponse } from "../services/user.service";
 import PageHeader from "../components/PageHeader";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import GymButton from "../components/GymButton";
@@ -43,7 +43,6 @@ export default function StorePage() {
 
     // Products
     const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
@@ -102,8 +101,6 @@ export default function StorePage() {
 
     // Pagination
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [total, setTotal] = useState(0);
     const limit = 20;
 
     const loadProducts = async () => {
@@ -128,26 +125,53 @@ export default function StorePage() {
     });
 
     useEffect(() => {
-        Promise.all([loadProducts(), getCategories().then((r) => setCategories(r.data ?? [])).catch(() => {})])
-            .finally(() => setLoading(false));
+        let active = true;
+        (async () => {
+            try {
+                const prodRes = await getProducts();
+                if (!active) return;
+                setProducts(prodRes.data ?? []);
+            } catch {
+                if (active) setError(true);
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
     }, []);
 
     useEffect(() => {
-        if (tab === "sales") loadSales();
+        if (tab !== "sales") return;
+        let active = true;
+        (async () => {
+            setSalesLoading(true);
+            try {
+                const res = await getSales();
+                if (active) setSales(res.data ?? []);
+            } catch { /* ignore */ }
+            finally { if (active) setSalesLoading(false); }
+        })();
+        return () => { active = false; };
     }, [tab]);
 
     useEffect(() => {
-        if (saleDrawer) {
-            Promise.all([
-                getMembers(1, 200).then((r) => setMembers(r.data?.items ?? [])).catch(() => {}),
-                getUsers().then((r) => setStaffUsers((r.data ?? []).map((u: any) => ({ id: u.id, fullName: `${u.firstName} ${u.lastName}`, email: u.email })))).catch(() => {}),
+        if (!saleDrawer) return;
+        let active = true;
+        (async () => {
+            const [memRes, usrRes] = await Promise.all([
+                getMembers(1, 200).catch(() => ({ data: { items: [] as { id: string; fullName: string; email?: string }[] } })),
+                getUsers().catch(() => ({ data: [] as UserResponse[] })),
             ]);
-        }
+            if (!active) return;
+            setMembers(memRes.data?.items ?? []);
+            setStaffUsers((usrRes.data ?? []).map((u: UserResponse) => ({ id: u.id, fullName: `${u.firstName} ${u.lastName}`, email: u.email })));
+        })();
+        return () => { active = false; };
     }, [saleDrawer]);
 
     // Filtered + sorted products
     const filtered = useMemo(() => {
-        let result = products.filter((p) => {
+        const result = products.filter((p) => {
             if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
             if (catFilter && p.category !== catFilter) return false;
             if (priceMin && p.price < Number(priceMin)) return false;
@@ -172,17 +196,13 @@ export default function StorePage() {
     }, [products, search, catFilter, priceMin, priceMax, stockFilter, sortBy]);
 
     // Paginated
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    if (page > totalPages) setPage(totalPages);
     const paginated = useMemo(() => {
         const start = (page - 1) * limit;
         return filtered.slice(start, start + limit);
     }, [filtered, page, limit]);
-
-    useEffect(() => {
-        const tp = Math.max(1, Math.ceil(filtered.length / limit));
-        setTotalPages(tp);
-        setTotal(filtered.length);
-        if (page > tp) setPage(tp);
-    }, [filtered.length, limit, page]);
 
     const allCategories = useMemo(() => {
         const map = new Map<string, number>();
@@ -224,17 +244,17 @@ export default function StorePage() {
         if (!prodForm.name.trim() || !prodForm.category.trim()) return;
         setProdSaving(true);
         try {
-            const payload: any = {
+            const payload = {
                 name: prodForm.name,
                 description: prodForm.description || undefined,
                 price: prodForm.price,
                 stock: prodForm.stock,
                 category: prodForm.category,
                 featured: prodForm.featured,
+                originalPrice: prodForm.originalPrice > 0 ? prodForm.originalPrice : undefined,
+                salePrice: prodForm.salePrice > 0 ? prodForm.salePrice : undefined,
+                saleEndDate: prodForm.saleEndDate ? new Date(prodForm.saleEndDate).toISOString() : undefined,
             };
-            if (prodForm.originalPrice > 0) payload.originalPrice = prodForm.originalPrice;
-            if (prodForm.salePrice > 0) payload.salePrice = prodForm.salePrice;
-            if (prodForm.saleEndDate) payload.saleEndDate = new Date(prodForm.saleEndDate).toISOString();
 
             let productId = editingProd;
             if (editingProd) {
@@ -251,7 +271,8 @@ export default function StorePage() {
             }
             setProdDrawer(false);
             loadProducts();
-        } catch (err: any) {
+        } catch (e) {
+            const err = e as { response?: { data?: { message?: string } } };
             addToast(err?.response?.data?.message || "Error al guardar", "error");
         } finally { setProdSaving(false); }
     };
@@ -262,8 +283,8 @@ export default function StorePage() {
             setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, stock: editingStockVal } : p));
             setEditingStockId(null);
             addToast("Stock actualizado");
-        } catch (err: any) {
-            addToast(err?.response?.data?.message || "Error", "error");
+        } catch {
+            addToast("Error al actualizar stock", "error");
         }
     };
 
@@ -272,8 +293,8 @@ export default function StorePage() {
             const res = await toggleProductFeatured(id);
             setProducts((prev) => prev.map((p) => p.id === id ? { ...p, featured: res.data.featured } : p));
             addToast(res.data.featured ? "Producto destacado" : "Producto no destacado");
-        } catch (err: any) {
-            addToast(err?.response?.data?.message || "Error", "error");
+        } catch {
+            addToast("Error al cambiar destacado", "error");
         }
     };
 
@@ -299,7 +320,8 @@ export default function StorePage() {
                 loadSales();
                 loadProducts();
             }
-        } catch (err: any) {
+        } catch (e) {
+            const err = e as { response?: { data?: { message?: string } } };
             addToast(err?.response?.data?.message || "Error", "error");
         } finally { setConfirmLoading(false); setConfirmOpen(false); setConfirmTarget(null); }
     };
@@ -351,7 +373,8 @@ export default function StorePage() {
             setSaleBuyerEmail("");
             loadProducts();
             loadSales();
-        } catch (err: any) {
+        } catch (e) {
+            const err = e as { response?: { data?: { message?: string } } };
             addToast(err?.response?.data?.message || "Error al registrar venta", "error");
         } finally { setSaleSaving(false); }
     };
@@ -578,7 +601,7 @@ export default function StorePage() {
                                                 <td style={{ ...styles.td, ...styles.muted }}>{p.category}</td>
                                                 <td style={styles.td}>
                                                     {p.salePrice && p.salePrice > 0 ? (
-                                                        <span><span style={{ textDecoration: "line-through", color: "#bbb", marginRight: 4 }}>${p.price.toFixed(2)}</span>${p.salePrice.toFixed(2)}</span>
+                                                        <span><span style={{ textDecoration: "line-through", color: "#bbb", marginRight: 4 }}>${p.price.toFixed(2)}</span>${p.salePrice!.toFixed(2)}</span>
                                                     ) : (
                                                         `$${p.price.toFixed(2)}`
                                                     )}
@@ -641,7 +664,6 @@ export default function StorePage() {
                                 {paginated.map((p) => {
                                     const inactive = p.status !== "active";
                                     const lowStock = p.stock <= 5 && !inactive;
-                                    const onSale = p.salePrice && p.salePrice > 0 && (!p.saleEndDate || new Date(p.saleEndDate) > new Date());
                                     return (
                                         <div key={p.id} className={`product-card ${inactive ? "product-card-inactive" : ""} ${p.featured ? "product-card-featured" : ""}`}>
                                             <div className="product-card-img">
@@ -669,10 +691,10 @@ export default function StorePage() {
                                             <div className="product-card-body">
                                                 <span className="product-card-category">{p.category}</span>
                                                 <h3 className="product-card-name" title={p.description || ""}>{p.name}</h3>
-                                                {onSale ? (
+                                                {p.salePrice && p.salePrice > 0 && (!p.saleEndDate || new Date(p.saleEndDate) > new Date()) ? (
                                                     <p className="product-card-price">
                                                         <span style={{ textDecoration: "line-through", color: "#bbb", fontSize: 11, marginRight: 4 }}>${p.price.toFixed(2)}</span>
-                                                        <span style={{ color: "#c0392b" }}>${p.salePrice.toFixed(2)}</span>
+                                                        <span style={{ color: "#c0392b" }}>${p.salePrice!.toFixed(2)}</span>
                                                     </p>
                                                 ) : (
                                                     <p className="product-card-price">${p.price.toFixed(2)}</p>
@@ -803,7 +825,7 @@ export default function StorePage() {
                         <label style={{ ...styles.label, marginTop: 12 }}>Categoría</label>
                         <input style={styles.input} value={prodForm.category} onChange={(e) => setProdForm((p) => ({ ...p, category: e.target.value }))} list="cat-list" placeholder="Ej: Proteínas" />
                         <datalist id="cat-list">
-                            {allCategories.map((c) => <option key={c} value={c} />)}
+                            {allCategories.map(([cat]) => <option key={cat} value={cat} />)}
                         </datalist>
 
                         {/* Featured toggle */}
@@ -1045,7 +1067,7 @@ export default function StorePage() {
                         {viewProduct.salePrice && viewProduct.salePrice > 0 && (!viewProduct.saleEndDate || new Date(viewProduct.saleEndDate) > new Date()) ? (
                             <p style={{ fontSize: 22, fontWeight: 700, color: "#c0392b", margin: "4px 0 8px" }}>
                                 <span style={{ textDecoration: "line-through", color: "#bbb", fontSize: 16, fontWeight: 400, marginRight: 6 }}>${viewProduct.price.toFixed(2)}</span>
-                                ${viewProduct.salePrice.toFixed(2)}
+                                ${viewProduct.salePrice!.toFixed(2)}
                             </p>
                         ) : (
                             <p style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: "4px 0 8px" }}>${viewProduct.price.toFixed(2)}</p>

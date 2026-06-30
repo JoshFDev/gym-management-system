@@ -26,7 +26,7 @@ export default function LeftPanel() {
                 </div>
                 <div className="divider-anim" style={s.divider} />
                 <div style={s.features}>
-                    {["Gestión de miembros", "Pagos y suscripciones", "Control de asistencia"].map((f, i) => (
+                    {["Gestión de miembros", "Pagos y suscripciones", "Control de asistencia"].map((f) => (
                         <div key={f} className="feat-anim" style={s.feature}>
                             <span style={s.featDot} />
                             <span>{f}</span>

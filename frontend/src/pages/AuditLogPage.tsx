@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getAuditLogs } from "../services/audit-log.service";
 import PageHeader from "../components/PageHeader";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -61,22 +61,24 @@ export default function AuditLogPage() {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
 
-    const load = () => {
-        setLoading(true);
-        getAuditLogs({
+    const fetchLogs = useCallback(async () => {
+        const res = await getAuditLogs({
             entity: entityFilter || undefined,
             role: roleFilter || undefined,
             dateFrom: dateFrom || undefined,
             dateTo: dateTo || undefined,
-        })
-            .then((res) => setLogs(res.data ?? []))
-            .catch(() => setLogs([]))
-            .finally(() => setLoading(false));
-    };
+        });
+        return res.data ?? [];
+    }, [entityFilter, roleFilter, dateFrom, dateTo]);
 
     useEffect(() => {
-        load();
-    }, [entityFilter, roleFilter, dateFrom, dateTo]);
+        let active = true;
+        fetchLogs()
+            .then((data) => { if (active) setLogs(data); })
+            .catch(() => { if (active) setLogs([]); })
+            .finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
+    }, [fetchLogs]);
 
     return (
         <div style={s.page}>

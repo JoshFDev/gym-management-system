@@ -77,9 +77,14 @@ export const deleteUser = async (
         throw new NotFoundError("Usuario no encontrado.");
     }
 
+    if (!user.isActive) {
+        await User.findByIdAndDelete(id);
+        return { user, deleted: true as const };
+    }
+
     user.isActive = false;
 
     await user.save();
 
-    return user;
+    return { user, deleted: false as const };
 };

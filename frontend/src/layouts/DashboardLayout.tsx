@@ -75,6 +75,23 @@ export default function DashboardLayout() {
     );
 
     const handleLogout = () => {
+        try {
+            const ctx = new AudioContext();
+            const t = ctx.currentTime;
+            const g = ctx.createGain();
+            g.connect(ctx.destination);
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.05, t + 0.02);
+            g.gain.linearRampToValueAtTime(0.05, t + 0.2);
+            g.gain.linearRampToValueAtTime(0, t + 0.4);
+            const o = ctx.createOscillator();
+            o.type = "sine";
+            o.frequency.setValueAtTime(660, t);
+            o.frequency.linearRampToValueAtTime(330, t + 0.3);
+            o.connect(g);
+            o.start(t);
+            o.stop(t + 0.4);
+        } catch { /* audio not supported */ }
         disconnectSocket();
         clearAuth();
         navigate("/login");

@@ -1,11 +1,9 @@
 import { Router } from "express";
-import { login, profile } from "./memberPortal.controller";
-import { authenticate } from "../../shared/middlewares/authenticate";
-import { authLimiter } from "../../shared/middlewares/rateLimiters";
+import { catalog, categories } from "./memberPortal.controller";
 
 const router = Router();
 
-router.post("/login", authLimiter, login);
-router.get("/me", authenticate, profile);
+router.get("/products", catalog);
+router.get("/categories", categories);
 
 export default router;

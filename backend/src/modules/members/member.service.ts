@@ -77,6 +77,15 @@ export const updateMember = async (
 };
 
 export const deleteMember = async (id: string) => {
+    const member = await Member.findById(id);
+    if (!member) {
+        throw new NotFoundError("Miembro no encontrado.");
+    }
+
+    if (member.membershipStatus === MembershipStatus.ACTIVE) {
+        throw new BadRequestError("Desactiva al miembro antes de eliminarlo.");
+    }
+
     const activeSub = await Subscription.findOne({
         memberId: id,
         status: SubscriptionStatus.ACTIVE,
@@ -85,16 +94,7 @@ export const deleteMember = async (id: string) => {
         throw new BadRequestError("El miembro tiene una suscripción activa. No se puede eliminar.");
     }
 
-    const hasPayments = await Payment.exists({ memberId: id });
-    if (hasPayments) {
-        throw new BadRequestError("El miembro tiene pagos registrados. Cancele o marque como reembolso antes de eliminar.");
-    }
-
-    const member = await Member.findByIdAndDelete(id);
-    if (!member) {
-        throw new NotFoundError("Miembro no encontrado.");
-    }
-
+    await Member.findByIdAndDelete(id);
     return member;
 };
 

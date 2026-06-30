@@ -6,7 +6,7 @@ import { UnauthorizedError } from "../../shared/errors/UnauthorizedError";
 import { BadRequestError } from "../../shared/errors/BadRequestError";
 import { generateToken } from "../../utils/jwt";
 import crypto from "crypto";
-import { sendMail } from "../../shared/utils/mail.util";
+import { sendMail, buildEmailHtml, GOLD } from "../../shared/utils/mail.util";
 
 const hashToken = (token: string) =>
     crypto.createHash("sha256").update(token).digest("hex");
@@ -106,14 +106,24 @@ export const forgotPassword = async (
 
     await sendMail(
         user.email,
-        "Reset your ZenithGym password",
-        `
-            <h2>Password reset request</h2>
-            <p>You requested to reset your password.</p>
-            <p>Click the link below to create a new password:</p>
-            <a href="${resetUrl}">${resetUrl}</a>
-            <p>This link expires in 15 minutes.</p>
-        `
+        "Restablece tu contraseña - ZenithGym",
+        buildEmailHtml(`
+            <p style="color: #333; font-size: 15px; margin: 0 0 16px;">
+                Hola <strong>${user.firstName} ${user.lastName}</strong>,
+            </p>
+            <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 8px;">
+                Recibimos una solicitud para restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva:
+            </p>
+            <div style="text-align: center; margin: 22px 0;">
+                <a href="${resetUrl}"
+                   style="display: inline-block; padding: 11px 28px; background: ${GOLD}; color: #fff; text-decoration: none; border-radius: 7px; font-size: 14px; font-weight: 600;">
+                    Restablecer contraseña
+                </a>
+            </div>
+            <p style="color: #bbb; font-size: 12px; margin: 0;">
+                Este enlace expira en 15 minutos. Si no solicitaste este cambio, ignora este correo.
+            </p>
+        `)
     );
 };
 

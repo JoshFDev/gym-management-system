@@ -1,17 +1,19 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import User from "../../modules/auth/auth.model";
 
 import { verifyToken } from "../../utils/jwt";
 import { UnauthorizedError } from "../errors/UnauthorizedError";
+import { asyncHandler } from "./asyncHandler";
+import type { AuthRequest } from "./authenticate";
 
-export interface AuthRequest extends Request {
+export interface AuthRequest {
     user?: {
         userId: string;
         role: string;
     };
 }
 
-export const authenticate = async (
+export const authenticate = asyncHandler(async (
     req: AuthRequest,
     _res: Response,
     next: NextFunction
@@ -48,4 +50,4 @@ export const authenticate = async (
     };
 
     next();
-};
+});

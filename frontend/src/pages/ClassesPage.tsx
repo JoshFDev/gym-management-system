@@ -142,9 +142,9 @@ export default function ClassesPage() {
                 addToast("Clase creada");
             }
             setDrawerOpen(false); load();
-        } catch (err: any) {
-            const msg = err?.response?.data?.message || "Error al guardar";
-            addToast(msg, "error");
+        } catch (e) {
+            const err = e as { response?: { data?: { message?: string } } };
+            addToast(err?.response?.data?.message || "Error al guardar", "error");
         }
         finally { setSaving(false); }
     };

@@ -1,40 +1,33 @@
-import bcrypt from "bcrypt";
-import Member from "../members/member.model";
-import { NotFoundError } from "../../shared/errors/NotFoundError";
-import { UnauthorizedError } from "../../shared/errors/UnauthorizedError";
-import { generateToken } from "../../utils/jwt";
+import Product from "../products/product.model";
+import { ProductStatus } from "../products/product.types";
 
-interface MemberTokenPayload {
-    userId: string;
-    role: "member";
+interface CatalogFilters {
+    search?: string;
+    category?: string;
 }
 
-export const memberLogin = async (email: string, password: string) => {
-    const member = await Member.findOne({ email }).select("+password");
-    if (!member) throw new UnauthorizedError("Credenciales inválidas");
+export const getCatalogProducts = async (filters: CatalogFilters = {}) => {
+    const query: Record<string, unknown> = { status: ProductStatus.ACTIVE };
+    if (filters.search) query.name = { $regex: filters.search, $options: "i" };
+    if (filters.category) query.category = filters.category;
 
-    const valid = await bcrypt.compare(password, member.password!);
-    if (!valid) throw new UnauthorizedError("Credenciales inválidas");
-
-    const token = generateToken({ userId: member._id.toString(), role: "member" } as MemberTokenPayload);
-
-    await Member.findByIdAndUpdate(member._id, { lastLogin: new Date() });
-
-    return {
-        token,
-        member: {
-            id: member._id.toString(),
-            firstName: member.firstName,
-            lastName: member.lastName,
-            email: member.email,
-            phone: member.phone,
-            membershipStatus: member.membershipStatus,
-        },
-    };
+    const products = await Product.find(query).sort({ name: 1 }).lean();
+    return products.map((p) => ({
+        id: p._id.toString(),
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        originalPrice: p.originalPrice,
+        salePrice: p.salePrice,
+        saleEndDate: p.saleEndDate?.toISOString(),
+        stock: p.stock,
+        category: p.category,
+        image: p.image,
+        images: p.images,
+    }));
 };
 
-export const getMemberProfile = async (memberId: string) => {
-    const member = await Member.findById(memberId);
-    if (!member) throw new NotFoundError("Miembro no encontrado");
-    return member;
+export const getCatalogCategories = async () => {
+    const categories = await Product.find({ status: ProductStatus.ACTIVE }).distinct("category");
+    return categories.sort();
 };

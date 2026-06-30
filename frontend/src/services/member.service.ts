@@ -77,3 +77,8 @@ export const createMember = async (
 
     return response.data;
 };
+
+export const sendQRCodeEmail = async (id: string) => {
+    const response = await api.post(`/members/${id}/send-qr`);
+    return response.data;
+};

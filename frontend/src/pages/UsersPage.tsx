@@ -493,8 +493,9 @@ export default function UsersPage() {
         if (!deleteTarget) return;
         setDeleteLoading(true);
         try {
-            await deleteUser(deleteTarget.id);
-            addToast(`${deleteTarget.firstName} eliminado del sistema`);
+            const res = await deleteUser(deleteTarget.id);
+            const isHardDelete = res.data?.isActive === false && deleteTarget.isActive === false;
+            addToast(isHardDelete ? `${deleteTarget.firstName} eliminado del sistema` : `${deleteTarget.firstName} desactivado`);
             await loadUsers();
         } catch {
             addToast("No se pudo eliminar el usuario.", "error");
@@ -868,7 +869,7 @@ const s: Record<string, React.CSSProperties> = {
     formGrid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
     fieldLabel: { fontSize: 11, fontWeight: 500, color: "#555" },
     fieldError: { fontSize: 10, color: "#c0392b", marginTop: 1 },
-    inputError: { borderColor: "#fecaca" },
+    inputError: { border: "1px solid #fecaca" },
     input: {
         background: "#F7F7F6", border: "1px solid #E5E4E2", borderRadius: 6,
         padding: "8px 11px", fontSize: 13, color: "#1a1a1a", outline: "none",

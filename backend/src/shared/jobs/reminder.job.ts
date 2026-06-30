@@ -4,7 +4,7 @@ import { SubscriptionStatus } from "../../modules/subscriptions/subscription.typ
 import Payment from "../../modules/payments/payment.model";
 import { PaymentStatus } from "../../modules/payments/payment.types";
 import Member from "../../modules/members/member.model";
-import { sendMail } from "../utils/mail.util";
+import { sendMail, buildEmailHtml, GOLD } from "../utils/mail.util";
 
 const DAYS_BEFORE_EXPIRY = 3;
 
@@ -35,25 +35,22 @@ const sendExpiringReminders = async () => {
         await sendMail(
             memberEmail,
             "Tu suscripción en ZenithGym está por vencer",
-            `
-                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #1a1a1a;">¡Tu suscripción está por vencer!</h2>
-                    <p style="color: #555; font-size: 14px; line-height: 1.6;">
-                        Tu plan <strong>${planName}</strong> vence el <strong>${endDate}</strong>.
-                    </p>
-                    <p style="color: #555; font-size: 14px; line-height: 1.6;">
-                        Renueva ahora para seguir disfrutando de todas las instalaciones y servicios de ZenithGym.
-                    </p>
+            buildEmailHtml(`
+                <p style="color: #333; font-size: 15px; margin: 0 0 12px;">¡Tu suscripción está por vencer!</p>
+                <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 4px;">
+                    Tu plan <strong>${planName}</strong> vence el <strong>${endDate}</strong>.
+                </p>
+                <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 18px;">
+                    Renueva ahora para seguir disfrutando de todas las instalaciones.
+                </p>
+                <div style="text-align: center;">
                     <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/subscriptions"
-                       style="display: inline-block; background: #1a1a1a; color: #fff; text-decoration: none;
-                              padding: 10px 20px; border-radius: 8px; font-size: 13px; margin-top: 12px;">
+                       style="display: inline-block; background: ${GOLD}; color: #fff; text-decoration: none;
+                              padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;">
                         Renovar suscripción
                     </a>
-                    <p style="color: #bbb; font-size: 11px; margin-top: 24px;">
-                        ZenithGym · Panel de administración
-                    </p>
                 </div>
-            `
+            `)
         );
     }
 };
@@ -73,26 +70,23 @@ const sendPendingPaymentReminders = async () => {
         await sendMail(
             memberEmail,
             "Tienes un pago pendiente en ZenithGym",
-            `
-                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #1a1a1a;">Pago pendiente</h2>
-                    <p style="color: #555; font-size: 14px; line-height: 1.6;">
-                        Tienes un saldo pendiente de <strong>$${amount}</strong>
-                        ${dueDate ? `con fecha de vencimiento el <strong>${dueDate}</strong>.` : "."}
-                    </p>
-                    <p style="color: #555; font-size: 14px; line-height: 1.6;">
-                        Realiza tu pago para mantener tu suscripción activa sin interrupciones.
-                    </p>
+            buildEmailHtml(`
+                <p style="color: #333; font-size: 15px; margin: 0 0 12px;">Tienes un pago pendiente</p>
+                <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 4px;">
+                    Saldo pendiente: <strong>$${amount}</strong>
+                    ${dueDate ? `con vencimiento el <strong>${dueDate}</strong>.` : "."}
+                </p>
+                <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 18px;">
+                    Realiza tu pago para mantener tu suscripción activa.
+                </p>
+                <div style="text-align: center;">
                     <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/payments"
-                       style="display: inline-block; background: #1a1a1a; color: #fff; text-decoration: none;
-                              padding: 10px 20px; border-radius: 8px; font-size: 13px; margin-top: 12px;">
+                       style="display: inline-block; background: ${GOLD}; color: #fff; text-decoration: none;
+                              padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;">
                         Revisar pagos
                     </a>
-                    <p style="color: #bbb; font-size: 11px; margin-top: 24px;">
-                        ZenithGym · Panel de administración
-                    </p>
                 </div>
-            `
+            `)
         );
     }
 };
