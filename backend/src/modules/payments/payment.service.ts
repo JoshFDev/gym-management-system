@@ -1,6 +1,8 @@
 import Member from "../members/member.model";
+import Plan from "../plans/plan.model";
 import Subscription from "../subscriptions/subscription.model";
 import Payment from "./payment.model";
+import { PaymentStatus } from "./payment.types";
 import { paginate } from "../../shared/utils/pagination";
 
 import {
@@ -28,7 +30,7 @@ export const createPayment = async (
     const subscription =
         await Subscription.findById(
             data.subscriptionId
-        );
+        ).populate("planId", "name price");
 
     if (!subscription) {
         throw new NotFoundError(
@@ -36,12 +38,16 @@ export const createPayment = async (
         );
     }
 
+    const planPrice = (subscription.planId as any)?.price ?? 0;
+    const status = data.amount >= planPrice ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
+
     const payment = await Payment.create({
         memberId: member._id,
         subscriptionId: subscription._id,
         amount: data.amount,
         method: data.method,
         notes: data.notes,
+        status,
     });
 
     const populated = await Payment.findById(payment._id)

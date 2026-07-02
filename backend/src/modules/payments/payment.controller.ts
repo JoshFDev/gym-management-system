@@ -5,7 +5,7 @@ import { toPaymentResponse } from "./payment.dto";
 import { asyncHandler } from "../../shared/middlewares/asyncHandler";
 import { logAudit } from "../auditLog/auditLog.service";
 import { notifyAll } from "../../shared/services/socket.service";
-import { sendMail, buildEmailHtml } from "../../shared/utils/mail.util";
+import { sendMail, buildEmailHtml, GOLD } from "../../shared/utils/mail.util";
 
 export const create = asyncHandler(
     async (req: AuthRequest, res: Response) => {
@@ -15,22 +15,55 @@ export const create = asyncHandler(
         if (memberEmail) {
             const planName = (payment as any).subscriptionId?.planId?.name ?? "Plan";
             const amount = payment.amount;
+            const planPrice = (payment as any).subscriptionId?.planId?.price ?? 0;
             const endDate = (payment as any).subscriptionId?.endDate
                 ? new Date((payment as any).subscriptionId.endDate).toLocaleDateString("es-ES")
                 : "";
-            sendMail(
-                memberEmail,
-                "Confirmación de pago - ZenithGym",
-                buildEmailHtml(`
-                    <p style="color: #333; font-size: 15px; margin: 0 0 16px;">¡Gracias por tu pago!</p>
-                    <table style="width:100%; border-collapse:collapse; font-size: 13px; color: #555;">
-                        <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Plan</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">${planName}</td></tr>
-                        <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Monto</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">$${amount}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #888;">Vigencia hasta</td><td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">${endDate}</td></tr>
-                    </table>
-                    <p style="color: #888; font-size: 12px; margin: 16px 0 0;">Si tienes dudas, contacta a la recepción de ZenithGym.</p>
-                `)
-            ).catch(() => {});
+
+            if (payment.status === "partial") {
+                const remaining = planPrice - amount;
+                sendMail(
+                    memberEmail,
+                    "Pago parcial registrado - ZenithGym",
+                    buildEmailHtml(`
+                        <p style="color: #333; font-size: 15px; margin: 0 0 16px;">Hola,</p>
+                        <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 12px;">
+                            Recibimos un pago parcial de <strong>$${amount}</strong> para el plan <strong>${planName}</strong>.
+                        </p>
+                        <div style="background: #FFF8F0; border-radius: 8px; padding: 14px 18px; margin: 14px 0; border: 1px solid #F0E0C8;">
+                            <p style="margin: 0 0 6px; color: #333; font-size: 13px;">
+                                <strong>Saldo pendiente:</strong> <span style="color: #c0392b;">$${remaining.toFixed(2)}</span>
+                            </p>
+                            <p style="margin: 0; color: #888; font-size: 12px;">
+                                Total del plan: $${planPrice} · Pagado: $${amount}
+                            </p>
+                        </div>
+                        <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 18px;">
+                            Acude a recepción para liquidar tu saldo pendiente.
+                        </p>
+                        <div style="text-align: center; margin: 22px 0;">
+                            <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/payments"
+                               style="display: inline-block; padding: 11px 28px; background: ${GOLD}; color: #fff; text-decoration: none; border-radius: 7px; font-size: 14px; font-weight: 600;">
+                                Revisar pagos
+                            </a>
+                        </div>
+                    `)
+                ).catch(() => {});
+            } else {
+                sendMail(
+                    memberEmail,
+                    "Confirmacion de pago - ZenithGym",
+                    buildEmailHtml(`
+                        <p style="color: #333; font-size: 15px; margin: 0 0 16px;">Gracias por tu pago!</p>
+                        <table style="width:100%; border-collapse:collapse; font-size: 13px; color: #555;">
+                            <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Plan</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">${planName}</td></tr>
+                            <tr><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; color: #888;">Monto</td><td style="padding: 8px 0; border-bottom: 1px solid #ECEBE9; font-weight: 600; color: #1a1a1a;">$${amount}</td></tr>
+                            <tr><td style="padding: 8px 0; color: #888;">Vigencia hasta</td><td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">${endDate}</td></tr>
+                        </table>
+                        <p style="color: #888; font-size: 12px; margin: 16px 0 0;">Si tienes dudas, contacta a la recepcion de ZenithGym.</p>
+                    `)
+                ).catch(() => {});
+            }
         }
 
         await logAudit({

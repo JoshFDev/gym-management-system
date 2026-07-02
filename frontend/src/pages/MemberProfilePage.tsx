@@ -250,8 +250,8 @@ export default function MemberProfilePage() {
                                             <td style={s.td}>{fmtCurrency(p.amount)}</td>
                                             <td style={{ ...s.td, ...s.muted }}>{p.method}</td>
                                             <td style={s.td}>
-                                                <span style={{ ...s.badgeSm, background: p.status === "paid" ? "#F0F7F1" : "#FFF4F0", color: p.status === "paid" ? "#3a7d44" : "#c0392b" }}>
-                                                    {p.status === "paid" ? "Pagado" : p.status}
+                                                <span style={{ ...s.badgeSm, background: p.status === "paid" ? "#F0F7F1" : p.status === "partial" ? "#FFF8F0" : "#FFF4F0", color: p.status === "paid" ? "#3a7d44" : p.status === "partial" ? "#b8860b" : "#c0392b" }}>
+                                                    {p.status === "paid" ? "Pagado" : p.status === "partial" ? "Incompleto" : p.status}
                                                 </span>
                                             </td>
                                         </tr>

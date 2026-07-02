@@ -15,7 +15,7 @@ interface UpdateUserData {
 }
 
 export const getUsers = async (role?: UserRole) => {
-    const filter = role ? { role } : {};
+    const filter = role ? { role, isOwner: { $ne: true } } : { isOwner: { $ne: true } };
     const users = await User.find(filter)
         .sort({ createdAt: -1 });
 

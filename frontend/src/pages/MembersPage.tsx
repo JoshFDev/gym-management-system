@@ -133,7 +133,7 @@ function MemberDrawer({ open, editingId, saving, values, errors, touched, onChan
                     <p style={{ ...s.sectionLabel, marginTop: 16 }}><i className="ti ti-phone" style={{ fontSize: 12 }} aria-hidden /> Contacto</p>
                     <Field label="Teléfono" required error={errors.phone} touched={touched.phone}>
                         <input style={{ ...s.input, ...(touched.phone && errors.phone ? s.inputError : {}) }}
-                            placeholder="55-1234-5678" value={values.phone}
+                            placeholder="55-1234-5678" value={values.phone} inputMode="numeric"
                             onChange={(e) => onChange("phone", fmtPhone(e.target.value))} onBlur={() => onBlur("phone")} />
                     </Field>
                     <Field label="Correo electrónico" error={errors.email} touched={touched.email}>

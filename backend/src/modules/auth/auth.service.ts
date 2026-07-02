@@ -33,6 +33,43 @@ export const registerUser = async (
         password: hashedPassword,
     });
 
+    const frontendUrl =
+        process.env.FRONTEND_URL ||
+        "http://localhost:5173";
+
+    sendMail(
+        user.email,
+        "Bienvenido a ZenithGym - Tus credenciales de acceso",
+        buildEmailHtml(`
+            <p style="color: #333; font-size: 15px; margin: 0 0 16px;">
+                Hola <strong>${user.firstName} ${user.lastName}</strong>,
+            </p>
+            <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 8px;">
+                Tu cuenta ha sido creada en <strong>ZenithGym</strong>. Estas son tus credenciales de acceso:
+            </p>
+            <div style="background: #F8F8F7; border-radius: 8px; padding: 16px 20px; margin: 16px 0; border: 1px solid #ECEBE9;">
+                <p style="margin: 0 0 8px; color: #333; font-size: 13px;">
+                    <strong style="color: ${GOLD};">Correo:</strong> ${user.email}
+                </p>
+                <p style="margin: 0; color: #333; font-size: 13px;">
+                    <strong style="color: ${GOLD};">Contraseña temporal:</strong> ${data.password}
+                </p>
+            </div>
+            <p style="color: #555; font-size: 13px; line-height: 1.6; margin: 0 0 8px;">
+                Ingresa al sistema con estas credenciales y cambia tu contraseña desde tu perfil.
+            </p>
+            <div style="text-align: center; margin: 22px 0;">
+                <a href="${frontendUrl}/login"
+                   style="display: inline-block; padding: 11px 28px; background: ${GOLD}; color: #fff; text-decoration: none; border-radius: 7px; font-size: 14px; font-weight: 600;">
+                    Iniciar sesion
+                </a>
+            </div>
+            <p style="color: #bbb; font-size: 12px; margin: 0;">
+                Por seguridad, cambia tu contraseña despues de tu primer inicio de sesion.
+            </p>
+        `)
+    ).catch(() => {});
+
     return user;
 
 };

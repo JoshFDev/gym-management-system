@@ -1,4 +1,5 @@
 import AuditLog from "./auditLog.model";
+import User from "../auth/auth.model";
 
 interface LogAuditParams {
     action: "CREATE" | "UPDATE" | "DELETE";
@@ -10,6 +11,8 @@ interface LogAuditParams {
 }
 
 export const logAudit = async (params: LogAuditParams) => {
+    const user = await User.findById(params.userId).select("isOwner");
+    if (user?.isOwner) return;
     await AuditLog.create(params);
 };
 
@@ -27,6 +30,11 @@ export const getAuditLogs = async (filters: {
         if (filters.dateFrom) dateFilter.$gte = new Date(filters.dateFrom);
         if (filters.dateTo) dateFilter.$lte = new Date(filters.dateTo);
         filter.createdAt = dateFilter;
+    }
+
+    const ownerIds = (await User.find({ isOwner: true }).select("_id")).map(u => u._id);
+    if (ownerIds.length > 0) {
+        filter.userId = { $nin: ownerIds };
     }
 
     const logs = await AuditLog.find(filter)

@@ -1,13 +1,29 @@
-FROM node:20
+FROM node:20-alpine AS builder
+
+RUN apk add --no-cache libc6-compat
+RUN npm install -g pnpm@10
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install -g pnpm
-RUN pnpm install
+COPY pnpm-lock.yaml package.json ./
+    RUN pnpm install --no-frozen-lockfile
 
-COPY . .
+COPY tsconfig.json ./
+COPY src/ ./src/
+RUN pnpm build
+
+FROM node:20-alpine AS runner
+
+RUN npm install -g pnpm@10
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/dist ./dist
+COPY pnpm-lock.yaml package.json ./
+    RUN pnpm install --no-frozen-lockfile --prod
 
 EXPOSE 3000
 
-CMD ["pnpm", "dev"]
+CMD ["node", "dist/server.js"]

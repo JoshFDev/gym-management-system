@@ -190,14 +190,20 @@ export default function DashboardLayout() {
 
             {showAbout && (
                 <div style={s.overlay} onClick={() => setShowAbout(false)}>
-                    <div style={s.confirmBox} onClick={(e) => e.stopPropagation()}>
-                        <p style={s.confirmTitle}>Acerca de</p>
+                    <div style={{ ...s.confirmBox, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+                        <p style={s.confirmTitle}>Acerca de ZenithGym</p>
                         <p style={s.confirmText}>
-                            <strong>Gym Manager</strong> — Sistema de administración para gimnasios.<br /><br />
-                            Versión 1.0.0<br />
-                            Desarrollado con React + TypeScript + Express + MongoDB.
+                            <strong>ZenithGym Manager</strong> — Sistema integral de administración para gimnasios.<br /><br />
+                            <strong style={{ color: GOLD }}>Versión</strong> 2.0.0<br />
+                            <strong style={{ color: GOLD }}>Stack</strong> React + TypeScript + Express + MongoDB<br />
+                            <strong style={{ color: GOLD }}>Contenedores</strong> Docker + Nginx<br />
+                            <strong style={{ color: GOLD }}>Desarrollado por</strong> Sebastián Aboytes<br />
+                            <strong style={{ color: GOLD }}>Contacto</strong> sebastianaboytes199@gmail.com
                         </p>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                        <p style={{ ...s.confirmText, fontSize: 11, color: "#bbb", marginTop: 12, textAlign: "center" }}>
+                            &copy; {new Date().getFullYear()} ZenithGym. Todos los derechos reservados.
+                        </p>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                             <button style={s.confirmBtn} onClick={() => setShowAbout(false)}>Cerrar</button>
                         </div>
                     </div>

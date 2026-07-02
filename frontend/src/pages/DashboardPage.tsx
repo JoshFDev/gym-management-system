@@ -422,7 +422,7 @@ export default function DashboardPage() {
                                 <p style={s.empty}>Sin pagos.</p>
                             ) : payments.map((p) => (
                                 <div key={p.id} style={s.listRow}>
-                                    <div style={{ ...s.dot, background: p.status === "paid" ? "#3a7d44" : "#E5E4E2" }} />
+                                    <div style={{ ...s.dot, background: p.status === "paid" ? "#3a7d44" : p.status === "partial" ? "#D4AF37" : "#E5E4E2" }} />
                                     <div style={{ flex: 1 }}>
                                         <p style={s.listName}>{p.member.fullName}</p>
                                         <p style={s.listSub}>{fmtDate(p.paidAt)}</p>

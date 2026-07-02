@@ -80,6 +80,16 @@ const playConfirmSound = () => {
 };
 
 // ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+const fmtPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 2) return d;
+    if (d.length <= 6) return `${d.slice(0, 2)} ${d.slice(2)}`;
+    return `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}`;
+};
+
+// ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
 interface FormErrors { firstName?: string; lastName?: string; email?: string; phone?: string; password?: string; role?: string; }
@@ -291,8 +301,8 @@ function UserFormDrawer({
                     </div>
                     <Field label="Teléfono" error={errors.phone} touched={touched.phone}>
                         <input style={{ ...s.input, ...(touched.phone && errors.phone ? s.inputError : {}) }}
-                            placeholder="55 1234 5678" value={values.phone}
-                            onChange={(e) => onChange("phone", e.target.value)} onBlur={() => onBlur("phone")} />
+                            placeholder="55 1234 5678" value={values.phone} inputMode="numeric"
+                            onChange={(e) => onChange("phone", fmtPhone(e.target.value))} onBlur={() => onBlur("phone")} />
                     </Field>
 
                     <p style={{ ...s.sectionLabel, marginTop: 20 }}>

@@ -2,7 +2,7 @@ import rateLimit from "express-rate-limit";
 
 const config = process.env.NODE_ENV === "test"
     ? { windowMs: 1, max: 10000 }
-    : { windowMs: 15 * 60 * 1000, max: 100 };
+    : { windowMs: 15 * 60 * 1000, max: 500 };
 
 export const generalLimiter = rateLimit({
     ...config,

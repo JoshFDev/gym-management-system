@@ -354,9 +354,9 @@ export default function LoginPage() {
                                             )}
                                         </button>
                                     </div>
-                                </form>
+                                 </form>
                             )}
-                        </div>
+                         </div>
                     </div>
                     <p className="copy-anim" style={s.copy}>ZenithGym &copy; {new Date().getFullYear()}</p>
                 </div>

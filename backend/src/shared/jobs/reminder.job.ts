@@ -54,7 +54,7 @@ const sendExpiringReminders = async () => {
 };
 
 const sendPendingPaymentReminders = async () => {
-    const payments = await Payment.find({ status: PaymentStatus.PENDING }).populate("subscriptionId", "endDate");
+    const payments = await Payment.find({ status: { $in: [PaymentStatus.PENDING, PaymentStatus.PARTIAL as any] } }).populate("subscriptionId", "endDate");
 
     const memberIds = payments.map((p) => p.memberId);
     const members = await Member.find({ _id: { $in: memberIds } }).select("email firstName lastName");

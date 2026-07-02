@@ -76,7 +76,7 @@ export const getDashboardStats = async () => {
             paidAt: { $gte: prevMonthStart, $lte: prevMonthEnd },
         }),
 
-        Payment.countDocuments({ status: PaymentStatus.PENDING }),
+        Payment.countDocuments({ status: { $in: [PaymentStatus.PENDING, PaymentStatus.PARTIAL] } }),
     ]);
 
     const totalRevenue = paymentsThisMonth.reduce(

@@ -9,8 +9,11 @@ import { startReminderJob } from "./shared/jobs/reminder.job";
 
 const PORT = process.env.PORT || 3000;
 
+import { seedAdmin } from "./seed";
+
 const startServer = async () => {
     await connectDB();
+    await seedAdmin();
 
     const httpServer = http.createServer(app);
     initSocket(httpServer);

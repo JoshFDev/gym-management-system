@@ -33,11 +33,12 @@ interface FormErrors { memberId?: string; subscriptionId?: string; amount?: stri
 
 const statusStyle = (status: string): React.CSSProperties => ({
     paid: { background: "#F0F7F1", color: "#3a7d44" },
+    partial: { background: "#FFF8F0", color: "#b8860b" },
     pending: { background: "#FFF4F0", color: "#c0392b" },
     refunded: { background: "#F0F0EE", color: "#888", textDecoration: "line-through" },
 }[status] ?? { background: "#F0F0EE", color: "#888" });
 
-const statusLabel: Record<string, string> = { paid: "Pagado", pending: "Pendiente", refunded: "Reembolsado" };
+const statusLabel: Record<string, string> = { paid: "Pagado", partial: "Incompleto", pending: "Pendiente", refunded: "Reembolsado" };
 const methodLabel: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
@@ -443,6 +444,7 @@ export default function PaymentsPage() {
                         <select style={s.filterSelect} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
                             <option value="">Todos</option>
                             <option value="paid">Pagado</option>
+                            <option value="partial">Incompleto</option>
                             <option value="pending">Pendiente</option>
                             <option value="cancelled">Cancelado</option>
                         </select>
