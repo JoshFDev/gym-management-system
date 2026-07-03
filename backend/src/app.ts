@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import cors from "cors";
 
 import authRoutes from "./modules/auth/auth.routes";
@@ -66,12 +67,21 @@ app.use("/api/audit-logs", auditLogRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/sales", saleRoutes);
 
-// Health check
+// Health check (debe ir antes del catch-all de SPA)
 app.get("/api/health", (_req, res) => {
     res.json({
         status: "ok",
     });
 });
+
+// En modo escritorio (Electron), servimos el frontend compilado
+if (process.env.SERVE_FRONTEND) {
+    const frontendDist = path.join(__dirname, "../../frontend/dist");
+    app.use(express.static(frontendDist));
+    app.use((_req, res) => {
+        res.sendFile(path.join(frontendDist, "index.html"));
+    });
+}
 
 // Middleware global de errores
 app.use(errorHandler);

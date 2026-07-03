@@ -1,4 +1,13 @@
 {
+	"name": "zenithgym",
+	"version": "2.0.0",
+	"description": "Sistema de administración para gimnasios",
+	"main": "electron/main.js",
+	"scripts": {
+		"build": "cd backend && pnpm build && cd ../frontend && pnpm build",
+		"start": "electron .",
+		"dev": "pnpm build && electron ."
+	},
 	"dependencies": {
 		"chart.js": "^4.5.1",
 		"cors": "^2.8.6",
@@ -7,11 +16,16 @@
 		"pino": "^10.3.1",
 		"pino-http": "^11.0.0"
 	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["electron", "mongodb-memory-server"]
+	},
 	"devDependencies": {
 		"@types/cors": "^2.8.19",
 		"@types/helmet": "^4.0.0",
 		"@types/nodemailer": "^8.0.1",
 		"@types/recharts": "^2.0.1",
+		"electron": "^35.0.0",
+		"mongodb-memory-server": "^11.0.0",
 		"pino-pretty": "^13.1.3"
 	}
 }
