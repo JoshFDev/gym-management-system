@@ -41,7 +41,12 @@ export const authenticate = asyncHandler(async (
         );
     }
 
-    const payload = verifyToken(token);
+    let payload;
+    try {
+        payload = verifyToken(token);
+    } catch {
+        throw new UnauthorizedError("Token expirado o inválido.");
+    }
 
     const user = await User.findById(payload.userId).select("isActive role");
     if (!user || !user.isActive) {

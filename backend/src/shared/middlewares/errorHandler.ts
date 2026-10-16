@@ -18,11 +18,14 @@ export const errorHandler = (
     }
 
     // Log para desarrolladores
-    console.error("Unexpected Error:", err);
+    console.error("=== UNEXPECTED ERROR ===");
+    console.error(err);
 
     // Error genérico para el cliente
     res.status(500).json({
         success: false,
-        message: "Error interno del servidor",
+        message: process.env.NODE_ENV !== "production"
+            ? `Error: ${err.message}`
+            : "Error interno del servidor",
     });
 };
